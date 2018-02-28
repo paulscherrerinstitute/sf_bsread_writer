@@ -13,7 +13,8 @@ _logger = logging.getLogger(__name__)
 
 
 def buffer_bsread_messages(stream_address, buffer, receive_timeout=1000, mode=SUB):
-    _logger.info("Connecting to stream '%s'.", stream_address)
+
+    _logger.info("Input stream connecting to '%s'.", stream_address)
 
     with source(host=stream_address, mode=mode, receive_timeout=receive_timeout) as stream:
 
@@ -29,6 +30,9 @@ def buffer_bsread_messages(stream_address, buffer, receive_timeout=1000, mode=SU
 
 
 def send_bsread_message(output_port, buffer, mode=PUSH, buffer_timeout=10):
+
+    _logger.info("Output stream binding to port '%s'.", output_port)
+
     with sender(port=output_port, mode=mode, queue_size=1) as output_stream:
 
         while True:
