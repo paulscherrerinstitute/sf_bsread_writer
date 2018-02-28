@@ -1,38 +1,4 @@
-from logging import getLogger
-from threading import Event, Thread
-from collections import deque
-from time import sleep
 
-import h5py
-
-from mflow import mflow
-from bsread import dispatcher, SUB
-from bsread.handlers import compact
-
-BSREAD_START_TIMEOUT = 2
-BUFFER_SIZE = 100
-
-
-class BsreadBuffer(object):
-
-    _logger = getLogger(__name__)
-
-    def __init__(self):
-
-        # Parameters that need to be set.
-        self.channels = None
-        self.output_file = None
-        self.start_pulse_id = None
-        self.end_pulse_id = None
-
-        # Parameters with default value.
-        self.receive_timeout = 1000
-
-        self._buffer = deque(maxlen=BUFFER_SIZE)
-
-        self._receiving_thread = None
-        self._writing_thread = None
-        self._running_event = Event()
 
     def write_messages(self, start_pulse_id):
         self._logger.info("Writing channels to output_file '%s'.", self.output_file)
@@ -74,40 +40,6 @@ class BsreadBuffer(object):
 
         except:
             self._logger.exception("Error while writing bsread stream.")
-
-    def is_running(self):
-        return self._running_event.is_set()
-
-    def start(self):
-        # Check if all the needed input parameters are available.
-        self._validate_parameters()
-
-        self._logger.info("Requesting channels from dispatching layer: %s", self.channels)
-        address = dispatcher.request_stream(self.channels)
-
-        create_folder_if_does_not_exist(self.output_file)
-
-        self._running_event.clear()
-
-        self._receiving_thread = Thread(target=self.receive_messages, args=(address, ))
-        self._receiving_thread.start()
-
-        if not self._running_event.wait(BSREAD_START_TIMEOUT):
-            raise ValueError("Cannot start bsread writing process in time.")
-
-    def stop(self):
-        self._logger.debug("Stopping bsread_writer.")
-        self._running_event.clear()
-
-        if self._receiving_thread:
-            self._receiving_thread.join()
-            self._logger.debug("Join bsread receiving thread.")
-
-        if self._writing_thread:
-            self._writing_thread.join()
-            self._logger.debug("Join bsread writing thread.")
-
-        self._logger.debug("bsread_writer stopped.")
 
     @staticmethod
     def write_message_to_hdf5(h5_file, message, first_iteration):
