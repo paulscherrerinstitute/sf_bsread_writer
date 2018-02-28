@@ -16,7 +16,14 @@ def buffer_bsread_messages(stream_address, buffer, receive_timeout=1000, mode=SU
 
     _logger.info("Input stream connecting to '%s'.", stream_address)
 
-    with source(host=stream_address, mode=mode, receive_timeout=receive_timeout) as stream:
+    source_host, source_port = stream_address.rsplit(":", maxsplit=1)
+
+    source_host = source_host.split("//")[1]
+    source_port = int(source_port)
+
+    _logger.info("Input stream host '%s' and port '%s'.", source_host, source_port)
+
+    with source(host=source_host, port=source_port, mode=mode, receive_timeout=receive_timeout) as stream:
 
         while True:
             message = stream.receive()
