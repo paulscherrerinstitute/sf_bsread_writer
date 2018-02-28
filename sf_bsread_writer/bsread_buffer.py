@@ -36,7 +36,7 @@ def buffer_bsread_messages(stream_address, buffer, receive_timeout=1000, mode=SU
             _logger.debug('Message with pulse_id %d added to the buffer.', message.data.pulse_id)
 
 
-def send_bsread_message(output_port, buffer, mode=PUSH, buffer_timeout=10):
+def send_bsread_message(output_port, buffer, mode=PUSH, buffer_timeout=0.01):
 
     _logger.info("Output stream binding to port '%s'.", output_port)
 
