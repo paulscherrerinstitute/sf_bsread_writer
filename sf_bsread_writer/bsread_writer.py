@@ -102,11 +102,10 @@ class BsreadWriterManager(object):
 
     REQUIRED_PARAMETERS = ["general/created", "general/user", "general/process", "general/instrument"]
 
-    def __init__(self, stream_address, output_file, user_id, receive_timeout=1000, mode=PULL):
+    def __init__(self, stream_address, output_file, receive_timeout=1000, mode=PULL):
 
         self.stream_address = stream_address
         self.output_file = output_file
-        self.user_id = user_id
         self.receive_timeout = receive_timeout
         self.mode = mode
         self.parameters = {}
@@ -266,7 +265,7 @@ def register_rest_interface(app, manager):
         os._exit(0)
 
     @app.get("/statistics")
-    def get_staticstics():
+    def get_statistics():
         return {"state": "ok",
                 "status": manager.get_status(),
                 "statistics": manager.get_statistics()}
@@ -297,9 +296,14 @@ def register_rest_interface(app, manager):
 def start_server(stream_address, output_file, user_id, rest_port):
     app = bottle.Bottle()
 
-    manager = BsreadWriterManager(stream_address, output_file, user_id)
+    manager = BsreadWriterManager(stream_address, output_file)
 
     register_rest_interface(app, manager)
+
+    _logger.info("Setting bsread writer uid and gid to %s.", user_id)
+
+    os.setgid(user_id)
+    os.setuid(user_id)
 
     try:
         bottle.run(app=app, host="127.0.0.1", port=rest_port)
