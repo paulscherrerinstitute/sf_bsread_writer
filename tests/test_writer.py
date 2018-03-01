@@ -70,11 +70,14 @@ class TestBsreadWriter(unittest.TestCase):
         timestamp = 0
         timestamp_offset = 0
 
-        data = {"mock_data": 0}
+        data = {"device1": 0,
+                "device2": 0}
 
         with sender(port=self.stream_port, mode=PUSH, queue_size=1) as output_stream:
             for index in range(10):
                 pulse_id = index
+                data["device1"] = index + 100
+                data["device2"] = index + 200
 
                 output_stream.send(timestamp=(timestamp, timestamp_offset),
                                    pulse_id=pulse_id,

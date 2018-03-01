@@ -5,6 +5,8 @@ from threading import Event, Thread
 import bottle
 import h5py
 import os
+
+import numpy
 from bsread import PULL, source, json, bsread
 from bsread.data.serialization import channel_type_deserializer_mapping
 from bsread.handlers import extended
@@ -43,25 +45,27 @@ class BsreadWriter(object):
         data = message_data['data']
 
         self.h5_writer.write(data, dataset_group_name='data')
-        self.h5_writer.write(message_data['pulse_id_array'], dataset_group_name='pulse_id_array')
+        self.h5_writer.write(message_data['pulse_ids'], dataset_group_name='pulse_id')
 
     def prepare_datasets(self, message_data):
 
         data_header = message_data['data_header']
-        print("Data Header: ", data_header)
-
-        self.h5_writer.add_dataset('/pulse_id', dataset_group_name='pulse_id_array', dtype='i8')
+        _logger.debug("Data Header: ", data_header)
 
         # Interpret the data header and add required datasets
         for channel in data_header['channels']:
             channel_type = channel.get('type')
+
+            group_name = '/data/' + channel['name'] + "/"
+
+            self.h5_writer.add_dataset(group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8')
 
             if channel_type and channel_type.lower() == "string":
                 shape = [1]
                 maxshape = [None]
                 dtype = h5py.special_dtype(vlen=str)
 
-                self.h5_writer.add_dataset('/data/' + channel['name'], dataset_group_name='data', shape=shape,
+                self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
                                            maxshape=maxshape, dtype=dtype)
 
             else:
@@ -73,11 +77,24 @@ class BsreadWriter(object):
                     shape = [1] + channel['shape'][::-1]
                     maxshape = [None] + channel['shape'][::-1]
 
-                    print(shape, "  ", maxshape, channel['name'])
-                    self.h5_writer.add_dataset('/data/' + channel['name'], dataset_group_name='data', shape=shape,
+                    self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
                                                maxshape=maxshape, dtype=dtype)
                 else:
-                    self.h5_writer.add_dataset('/data/' + channel['name'], dataset_group_name='data', dtype=dtype)
+                    self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', dtype=dtype)
+
+        print(self.parameters)
+
+        self.h5_writer.file.create_dataset("/general/created",
+                                           data=numpy.string_(self.parameters["general/created"]))
+
+        self.h5_writer.file.create_dataset("/general/instrument",
+                                           data=numpy.string_(self.parameters["general/instrument"]))
+
+        self.h5_writer.file.create_dataset("/general/process",
+                                           data=numpy.string_(self.parameters["general/process"]))
+
+        self.h5_writer.file.create_dataset("/general/user",
+                                           data=numpy.string_(self.parameters["general/user"]))
 
     def close(self):
         self.h5_writer.close_file()
