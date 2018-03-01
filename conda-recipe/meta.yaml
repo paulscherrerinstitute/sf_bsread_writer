@@ -15,10 +15,12 @@ requirements:
     run:
         - python
         - bsread
+        - requests
 
 build:
   entry_points:
-    - sf_bsread_writer = sf_bsread_writer.start_server:main
+    - sf_bsread_writer = sf_bsread_writer.start_server:run
+    - sf_bsread_buffer = sf_bsread_writer.start_server:run
 
 about:
     home:
