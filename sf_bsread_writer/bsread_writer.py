@@ -330,7 +330,7 @@ def run():
     logging.basicConfig(level=arguments.log_level, format='[%(levelname)s] %(message)s')
 
     start_server(stream_address=arguments.stream_address,
-                 output_file=arguments.rest_port,
+                 output_file=arguments.output_file,
                  user_id=arguments.user_id,
                  rest_port=arguments.rest_port)
 
