@@ -3,87 +3,83 @@ import logging
 from threading import Event, Thread
 
 import bottle
+import h5py
 from bsread import PULL, source
+from bsread.data.serialization import channel_type_deserializer_mapping
+from bsread.writer import Writer
 
 _logger = logging.getLogger(__name__)
 
 
-def write_messages(self, start_pulse_id):
-        self._logger.info("Writing channels to output_file '%s'.", self.output_file)
-
-        try:
-            first_iteration = True
-
-            if start_pulse_id < self._buffer[0].data.pulse_id:
-                self._logger.warning("start_pulse_id < oldest buffered message pulse_id")
-
-            with h5py.File(self.output_file, 'w') as h5_file:
-                while self._running_event.is_set():
-                    if len(self._buffer) == 0:
-                        sleep(0.1)  # wait for more messages being buffered
-                        continue
-
-                    # process the oldest buffered message
-                    next_msg = self._buffer.popleft()
-                    msg_pulse_id = next_msg.data.pulse_id
-
-                    if self.end_pulse_id and self.end_pulse_id < msg_pulse_id:
-                        # no more messages to write
-                        end_pulse_id = self.end_pulse_id
-                        self.end_pulse_id = None
-
-                        # finilize hdf5 file
-                        if end_pulse_id < msg_pulse_id:
-                            self.prune_messages_in_hdf5(h5_file, end_pulse_id)
-
-                        break
-
-                    if msg_pulse_id < start_pulse_id:
-                        self._logger.debug('Discard %d', msg_pulse_id)
-                        continue  # discard the message
-
-                    self._logger.debug('Write to hdf5 %d', msg_pulse_id)
-                    self.write_message_to_hdf5(h5_file, next_msg, first_iteration)
-                    first_iteration = False
-
-        except:
-            self._logger.exception("Error while writing bsread stream.")
-
-    @staticmethod
-    def write_message_to_hdf5(h5_file, message, first_iteration):
-        """ Placeholder for a function to write message's content into hdf5 file.
-
-        Intended for debugging. Saves only pulse_ids of messages!
-        """
-        if first_iteration:
-            dset_pulse_id = h5_file.create_dataset('pulse_id', dtype='i8', shape=(1, 1), maxshape=(None, 1))
-        else:
-            dset_pulse_id = h5_file['pulse_id']
-            dset_pulse_id.resize(dset_pulse_id.shape[0] + 1, axis=0)
-
-        dset_pulse_id[-1] = message.data.pulse_id
-
-    @staticmethod
-    def prune_messages_in_hdf5(h5_file, end_pulse_id):
-        """ Placeholder for a function to prune hdf5 file content down to end_pulse_id.
-
-        Intended for debugging.
-        """
-        dset_pulse_id = h5_file['pulse_id']
-        while dset_pulse_id[-1] > end_pulse_id:
-            # this will also discard the data
-            # see the Note at http://docs.h5py.org/en/latest/high/dataset.html#resizable-datasets
-            dset_pulse_id.resize(dset_pulse_id.shape[0] - 1, axis=0)
-
 class BsreadWriter(object):
-    def __init__(self, output_file):
+    def __init__(self, output_file, parameters):
         self.output_file = output_file
+        self.parameters = parameters
+
+        self.h5_writer = Writer()
+        self.h5_writer.open_file(self.output_file)
+
+        self.first_iteration = True
 
     def prune_and_close(self, stop_pulse_id):
-        pass
+        # TODO: Prune.
+        # dset_pulse_id = h5_file['pulse_id']
+        # while dset_pulse_id[-1] > end_pulse_id:
+        #     # this will also discard the data
+        #     # see the Note at http://docs.h5py.org/en/latest/high/dataset.html#resizable-datasets
+        #     dset_pulse_id.resize(dset_pulse_id.shape[0] - 1, axis=0)
+
+        self.close()
 
     def write_message(self, message):
-        pass
+        message_data = message.data
+
+        if self.first_iteration and "data_header" in message_data:
+            self.prepare_datasets(message_data)
+            self.first_iteration = False
+
+        data = message_data['data']
+
+        self.h5_writer.write(data, dataset_group_name='data')
+        self.h5_writer.write(message_data['pulse_id_array'], dataset_group_name='pulse_id_array')
+
+    def prepare_datasets(self, message_data):
+
+        data_header = message_data['data_header']
+        print("Data Header: ", data_header)
+
+        self.h5_writer.add_dataset('/pulse_id', dataset_group_name='pulse_id_array', dtype='i8')
+
+        # Interpret the data header and add required datasets
+        for channel in data_header['channels']:
+            channel_type = channel.get('type')
+
+            if channel_type and channel_type.lower() == "string":
+                shape = [1]
+                maxshape = [None]
+                dtype = h5py.special_dtype(vlen=str)
+
+                self.h5_writer.add_dataset('/data/' + channel['name'], dataset_group_name='data', shape=shape,
+                                           maxshape=maxshape, dtype=dtype)
+
+            else:
+
+                dtype = channel_type_deserializer_mapping[channel_type][0]
+
+                if 'shape' in channel:
+                    # H5 is slowest dimension first, but bsread is fastest dimension first.
+                    shape = [1] + channel['shape'][::-1]
+                    maxshape = [None] + channel['shape'][::-1]
+
+                    print(shape, "  ", maxshape, channel['name'])
+                    self.h5_writer.add_dataset('/data/' + channel['name'], dataset_group_name='data', shape=shape,
+                                               maxshape=maxshape, dtype=dtype)
+                else:
+                    self.h5_writer.add_dataset('/data/' + channel['name'], dataset_group_name='data', dtype=dtype)
+
+    def close(self):
+        self.h5_file.close()
+
 
 class BsreadWriterManager(object):
     def __init__(self, stream_address, output_file, user_id, receive_timeout=1000, mode=PULL):
@@ -93,6 +89,7 @@ class BsreadWriterManager(object):
         self.user_id = user_id
         self.receive_timeout = receive_timeout
         self.mode = mode
+        self.parameters = {}
 
         self._running_event = Event()
         self._running_event.clear()
@@ -114,7 +111,7 @@ class BsreadWriterManager(object):
 
         last_pulse_id = -1
 
-        writer = BsreadWriter(self.output_file)
+        writer = BsreadWriter(self.output_file, self.parameters)
 
         with source(host=source_host, port=source_port,
                     mode=self.mode, receive_timeout=self.receive_timeout) as stream:
@@ -151,7 +148,8 @@ class BsreadWriterManager(object):
         _logger.info("Writing completed. Pulse_id range from %d to %d written to file.",
                      start_pulse_id, self.stop_pulse_id)
 
-
+    def set_parameters(self, parameters):
+        self.parameters = parameters
 
     def get_status(self):
         if self._writing_thread is None:
@@ -195,6 +193,14 @@ def register_rest_interface(app, manager):
         return {"state": "ok",
                 "status": manager.get_status()}
 
+    @app.post("/parameters")
+    def set_parameters():
+        manager.set_parameters(bottle.request.json)
+
+        return {"state": "ok",
+                "status": manager.get_status(),
+                "parameters": manager.get_parameters()}
+
     @app.get("/stop")
     def stop():
 
@@ -217,6 +223,7 @@ def register_rest_interface(app, manager):
 
         manager.stop_writer(pulse_id)
 
+
 def start_server(stream_address, output_file, user_id, rest_port):
     app = bottle.Bottle()
 
@@ -228,6 +235,7 @@ def start_server(stream_address, output_file, user_id, rest_port):
         bottle.run(app=app, host="127.0.0.1", port=rest_port)
     finally:
         pass
+
 
 def run():
     parser = argparse.ArgumentParser(description='bsread buffer')
