@@ -183,7 +183,7 @@ class BsreadWriterManager(object):
 
     def set_parameters(self, parameters):
 
-        _logger.debug("Setting parameters " % parameters)
+        _logger.debug("Setting parameters %s." % parameters)
 
         if not all(x in parameters for x in self.REQUIRED_PARAMETERS):
             raise ValueError("Missing mandatory parameters. Mandatory parameters '%s' but received '%s'." %
