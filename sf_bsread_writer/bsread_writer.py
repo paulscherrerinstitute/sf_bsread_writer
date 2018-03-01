@@ -4,7 +4,7 @@ from threading import Event, Thread
 
 import bottle
 import h5py
-from bsread import PULL, source
+from bsread import PULL, source, json
 from bsread.data.serialization import channel_type_deserializer_mapping
 from bsread.writer import Writer
 
@@ -82,6 +82,9 @@ class BsreadWriter(object):
 
 
 class BsreadWriterManager(object):
+
+    REQUIRED_PARAMETERS = ["general/created", "general/user", "general/process", "general/instrument"]
+
     def __init__(self, stream_address, output_file, user_id, receive_timeout=1000, mode=PULL):
 
         self.stream_address = stream_address
@@ -97,6 +100,7 @@ class BsreadWriterManager(object):
         self._writing_thread = None
 
         self.stop_pulse_id = None
+        self.last_pulse_id = -1
 
     def write_stream(self, start_pulse_id):
 
@@ -109,14 +113,10 @@ class BsreadWriterManager(object):
 
         _logger.info("First pulse_id to write: %d.", start_pulse_id)
 
-        last_pulse_id = -1
-
         writer = BsreadWriter(self.output_file, self.parameters)
 
         with source(host=source_host, port=source_port,
                     mode=self.mode, receive_timeout=self.receive_timeout) as stream:
-
-            nonlocal last_pulse_id
 
             self._running_event.set()
 
@@ -128,15 +128,15 @@ class BsreadWriterManager(object):
                 if message is None:
                     continue
 
-                last_pulse_id = message.data.pulse_id
-                _logger.debug('Received message with pulse_id %d.', last_pulse_id)
+                self.last_pulse_id = message.data.pulse_id
+                _logger.debug('Received message with pulse_id %d.', self.last_pulse_id)
 
                 # If this pulse_id was generated before the first detector image, discard it.
-                if last_pulse_id < start_pulse_id:
+                if self.last_pulse_id < start_pulse_id:
                     continue
 
                 # If the current pulse_id is above the stop_pulse_id, stop the recording.
-                if self.stop_pulse_id is not None and last_pulse_id > self.stop_pulse_id:
+                if self.stop_pulse_id is not None and self.last_pulse_id > self.stop_pulse_id:
                     writer.prune_and_close(self.stop_pulse_id)
 
                     _logger.info("Stopping bsread writer at pulse_id: %d" % self.stop_pulse_id)
@@ -149,7 +149,15 @@ class BsreadWriterManager(object):
                      start_pulse_id, self.stop_pulse_id)
 
     def set_parameters(self, parameters):
+
+        if not all(x in parameters for x in self.REQUIRED_PARAMETERS):
+            raise ValueError("Missing mandatory parameters. Mandatory parameters '%s' but received '%s'." %
+                             (self.REQUIRED_PARAMETERS, list(parameters.keys())))
+
         self.parameters = parameters
+
+    def get_paramters(self):
+        return self.parameters
 
     def get_status(self):
         if self._writing_thread is None:
@@ -222,6 +230,18 @@ def register_rest_interface(app, manager):
     def stop_pulse_id(pulse_id):
 
         manager.stop_writer(pulse_id)
+
+    @app.error(500)
+    def error_handler_500(error):
+        bottle.response.content_type = 'application/json'
+        bottle.response.status = 200
+
+        error_text = str(error.exception)
+
+        _logger.error(error_text)
+
+        return json.dumps({"state": "error",
+                           "status": error_text})
 
 
 def start_server(stream_address, output_file, user_id, rest_port):
