@@ -110,6 +110,9 @@ class BsreadWriterManager(object):
         self.mode = mode
         self.parameters = {}
 
+        _logger.info("Starting writer manager with stream_address %s, output_file %s.",
+                     self.stream_address, self.output_file)
+
         self._running_event = Event()
         self._running_event.clear()
 
@@ -270,15 +273,17 @@ def register_rest_interface(app, manager):
                 "status": manager.get_status(),
                 "statistics": manager.get_statistics()}
 
-    @app.put("/start_pulse_id/<pulse_id:int>")
+    @app.put("/start_pulse_id/<pulse_id>")
     def start_pulse_id(pulse_id):
+        _logger.info("Received start_pulse_id %s.", pulse_id)
 
-        manager.start_writer(pulse_id)
+        manager.start_writer(int(pulse_id))
 
-    @app.put("/stop_pulse_id/<pulse_id:int>")
+    @app.put("/stop_pulse_id/<pulse_id>")
     def stop_pulse_id(pulse_id):
+        _logger.info("Received stop_pulse_id %s.", pulse_id)
 
-        manager.stop_writer(pulse_id)
+        manager.stop_writer(int(pulse_id))
 
     @app.error(500)
     def error_handler_500(error):
