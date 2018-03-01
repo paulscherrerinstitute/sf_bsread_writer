@@ -311,6 +311,7 @@ def start_server(stream_address, output_file, user_id, rest_port):
     os.setuid(user_id)
 
     try:
+        _logger.info("Starting rest API on port %s." % rest_port)
         bottle.run(app=app, host="127.0.0.1", port=rest_port)
     finally:
         pass
