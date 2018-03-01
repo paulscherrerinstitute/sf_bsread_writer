@@ -133,7 +133,7 @@ class BsreadWriterManager(object):
                 if message is None:
 
                     # If the current pulse_id is above the stop_pulse_id, stop the recording.
-                    if self.stop_pulse_id is not None and self.last_pulse_id >= self.stop_pulse_id:
+                    if self.stop_pulse_id is not None and self.last_pulse_id > self.stop_pulse_id:
                         writer.prune_and_close(self.stop_pulse_id)
 
                         _logger.info("Stopping bsread writer at pulse_id: %d" % self.stop_pulse_id)
@@ -150,7 +150,7 @@ class BsreadWriterManager(object):
                     continue
 
                 # If the current pulse_id is above the stop_pulse_id, stop the recording.
-                if self.stop_pulse_id is not None and self.last_pulse_id >= self.stop_pulse_id:
+                if self.stop_pulse_id is not None and self.last_pulse_id > self.stop_pulse_id:
                     writer.prune_and_close(self.stop_pulse_id)
 
                     _logger.info("Stopping bsread writer at pulse_id: %d" % self.stop_pulse_id)
