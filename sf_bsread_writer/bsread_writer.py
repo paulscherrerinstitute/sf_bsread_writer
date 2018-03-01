@@ -7,7 +7,7 @@ import h5py
 import os
 
 import numpy
-from bsread import PULL, source, json, bsread
+from bsread import PULL, source, json
 from bsread.data.serialization import channel_type_deserializer_mapping
 from bsread.handlers import extended
 from bsread.writer import Writer
@@ -81,8 +81,6 @@ class BsreadWriter(object):
                                                maxshape=maxshape, dtype=dtype)
                 else:
                     self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', dtype=dtype)
-
-        print(self.parameters)
 
         self.h5_writer.file.create_dataset("/general/created",
                                            data=numpy.string_(self.parameters["general/created"]))
