@@ -310,6 +310,17 @@ def start_server(stream_address, output_file, user_id, rest_port):
     os.setgid(user_id)
     os.setuid(user_id)
 
+    filename_folder = os.path.dirname(output_file)
+
+    _logger.info("Writing output file to folder %s." % filename_folder)
+
+    # Create a folder if it does not exist.
+    if filename_folder and not os.path.exists(filename_folder):
+        _logger.info("Creating folder '%s'.", filename_folder)
+        os.makedirs(filename_folder, exist_ok=True)
+    else:
+        _logger.info("Folder '%s' already exists.", filename_folder)
+
     try:
         _logger.info("Starting rest API on port %s." % rest_port)
         bottle.run(app=app, host="127.0.0.1", port=rest_port)
