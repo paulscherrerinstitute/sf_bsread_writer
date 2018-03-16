@@ -20,7 +20,7 @@ class TestBsreadWriter(unittest.TestCase):
 
         self.writer_process = Process(target=bsread_writer.start_server, args=("tcp://127.0.0.1:%d" % self.stream_port,
                                                                                self.output_file,
-                                                                               "-1",
+                                                                               -1,
                                                                                self.rest_port))
 
         self.rest_url = "http://localhost:%d/" % self.rest_port

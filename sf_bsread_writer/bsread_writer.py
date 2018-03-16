@@ -45,7 +45,12 @@ class BsreadWriter(object):
         data = message_data['data']
 
         self.h5_writer.write(data, dataset_group_name='data')
+
         self.h5_writer.write(message_data['pulse_ids'], dataset_group_name='pulse_id')
+
+        # Because some channels might not be decoded properly, we have to write if data is written in a specific cell.
+        is_data_valid = [1 if data_point is not None else 0 for data_point in data]
+        self.h5_writer.write(is_data_valid, dataset_group_name='is_data_present')
 
     def prepare_datasets(self, message_data):
 
@@ -59,6 +64,8 @@ class BsreadWriter(object):
             group_name = '/data/' + channel['name'] + "/"
 
             self.h5_writer.add_dataset(group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8')
+
+            self.h5_writer.add_dataset(group_name + 'is_data_present', dataset_group_name='is_data_present', dtype='u1')
 
             if channel_type and channel_type.lower() == "string":
                 shape = [1]
@@ -305,14 +312,17 @@ def start_server(stream_address, output_file, user_id, rest_port):
 
     register_rest_interface(app, manager)
 
-    _logger.info("Setting bsread writer uid and gid to %s.", user_id)
+    if user_id != -1:
+        _logger.info("Setting bsread writer uid and gid to %s.", user_id)
+        os.setgid(user_id)
+        os.setuid(user_id)
 
-    os.setgid(user_id)
-    os.setuid(user_id)
+    else:
+        _logger.info("Not changing process uid and gid.")
 
     filename_folder = os.path.dirname(output_file)
 
-    _logger.info("Writing output file to folder %s." % filename_folder)
+    _logger.info("Writing output file to folder '%s'." % filename_folder)
 
     # Create a folder if it does not exist.
     if filename_folder and not os.path.exists(filename_folder):
