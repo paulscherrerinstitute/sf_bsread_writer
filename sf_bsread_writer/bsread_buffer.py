@@ -104,8 +104,11 @@ def run():
     # Setup the logging level.
     logging.basicConfig(level=arguments.log_level, format='[%(levelname)s] %(message)s')
 
-    data = json.load(open(arguments.channels_file))
-    channels = data["channels"]
+    _logger.info("Loading channels list file '%s'.", arguments.channels_file)
+
+    with open(arguments.channels_file) as input_file:
+        file_lines = input_file.readlines()
+        channels = [channel.strip() for channel in file_lines if not channel.strip().startswith("#") and channel.strip()]
 
     start_server(channels=channels, output_port=arguments.output_port, ring_buffer_length=arguments.buffer_length)
 
