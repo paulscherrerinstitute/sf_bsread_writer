@@ -58,7 +58,8 @@ def send_bsread_message(output_port, buffer, mode=PUSH, buffer_timeout=0.01):
 
             output_stream.send(timestamp=(message.data.global_timestamp, message.data.global_timestamp_offset),
                                pulse_id=message.data.pulse_id,
-                               data=data)
+                               data=data,
+                               check_data=True)
 
             _logger.debug("Message with pulse_id '%s' forwarded.", message.data.pulse_id)
 
