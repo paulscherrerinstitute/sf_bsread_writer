@@ -47,7 +47,7 @@ stream.connect()
 channels_definitions = {}
 
 for n_connection in range(n_connections):
-    _logger.info("Starting connection number %d." % n_connections)
+    _logger.info("Starting connection number %d." % n_connection)
 
     n_received_messages = 0
 
