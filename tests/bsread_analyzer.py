@@ -324,23 +324,23 @@ channels = [
 
 _logger.info("Requesting channels: %s", channels)
 
-stream_address = dispatcher.request_stream(channels)
-source_host, source_port = stream_address.rsplit(":", maxsplit=1)
-
-source_host = source_host.split("//")[1]
-source_port = int(source_port)
-
-_logger.info("Input stream host '%s' and port '%s'.", source_host, source_port)
-
 handler = extended.Handler()
-
-stream = Source(host=source_host, port=source_port, mode=SUB, receive_timeout=1000)
-stream.connect()
 
 channels_definitions = {}
 
 for n_connection in range(n_connections):
     _logger.info("Starting connection number %d." % n_connection)
+
+    stream_address = dispatcher.request_stream(channels)
+    source_host, source_port = stream_address.rsplit(":", maxsplit=1)
+
+    source_host = source_host.split("//")[1]
+    source_port = int(source_port)
+
+    _logger.info("Input stream host '%s' and port '%s'.", source_host, source_port)
+
+    stream = Source(host=source_host, port=source_port, mode=SUB, receive_timeout=1000)
+    stream.connect()
 
     n_received_messages = 0
 
@@ -392,3 +392,5 @@ for n_connection in range(n_connections):
             _logger.error("Requested channels and received channels are not the same.\n"
                           "Requested: %s\n",
                           "Received: %s", sorted(channels), sorted(message_channels))
+
+    stream.disconnect()
