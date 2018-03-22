@@ -4,7 +4,7 @@ from logging import getLogger
 from bsread import dispatcher, SUB, Source
 from bsread.handlers import extended
 
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s',
+logging.basicConfig(format='%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s',
                     level=logging.DEBUG,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -58,6 +58,8 @@ for n_connection in range(n_connections):
         if message is None:
             _logger.debug("Empty message.")
             continue
+
+        n_received_messages += 1
 
         pulse_id = message.data["header"]["pulse_id"]
 
