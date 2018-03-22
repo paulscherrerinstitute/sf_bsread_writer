@@ -10,8 +10,8 @@ logging.basicConfig(format='%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s'
 
 _logger = getLogger(__name__)
 
-n_connections = 10
-n_messages_per_connection = 50
+n_connections = 20
+n_messages_per_connection = 100
 
 _logger.info("Doing %d connection, each with %d messages.", n_connections, n_messages_per_connection)
 
@@ -367,7 +367,7 @@ for n_connection in range(n_connections):
             encoding = channel.get("encoding", "<")
 
             if message.data["data"][index] is None:
-                _logger.warning("Data for channel %s is None.")
+                _logger.warning("Data for channel %s is None.", name)
 
             message_channels.append(name)
 
