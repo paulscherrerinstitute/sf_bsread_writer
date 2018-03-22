@@ -366,6 +366,9 @@ for n_connection in range(n_connections):
             shape = channel.get("shape", [1])
             encoding = channel.get("encoding", "<")
 
+            if message.data["data"][index] is None:
+                _logger.warning("Data for channel %s is None.")
+
             message_channels.append(name)
 
             message_channel_definition = {"type": dtype,
