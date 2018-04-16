@@ -1,70 +1,92 @@
 import argparse
 import logging
 from collections import deque
-from threading import Thread
+from threading import Thread, Event
+from time import sleep
 
 from bsread import source, dispatcher
-from time import sleep
-import json
-
+from bsread.handlers import extended
 from bsread.sender import sender, PUSH, SUB
+
+from tests.bsread_analyzer import BsreadStreamAnalyzer
 
 _logger = logging.getLogger(__name__)
 
 
-def buffer_bsread_messages(stream_address, buffer, receive_timeout=1000, mode=SUB):
+def buffer_bsread_messages(stream_address, buffer, running_event, use_analyzer=False, receive_timeout=1000, mode=SUB):
 
     _logger.info("Input stream connecting to '%s'.", stream_address)
 
-    source_host, source_port = stream_address.rsplit(":", maxsplit=1)
+    try:
 
-    source_host = source_host.split("//")[1]
-    source_port = int(source_port)
+        source_host, source_port = stream_address.rsplit(":", maxsplit=1)
 
-    _logger.info("Input stream host '%s' and port '%s'.", source_host, source_port)
+        source_host = source_host.split("//")[1]
+        source_port = int(source_port)
 
-    with source(host=source_host, port=source_port, mode=mode, receive_timeout=receive_timeout) as stream:
+        _logger.info("Input stream host '%s' and port '%s'.", source_host, source_port)
 
-        while True:
-            message = stream.receive()
+        handler = extended.Handler()
 
-            # In case you set a receive timeout, the returned message can be None.
-            if message is None:
-                continue
+        with source(host=source_host, port=source_port, mode=mode, receive_timeout=receive_timeout) as stream:
 
-            buffer.append(message)
-            _logger.debug('Message with pulse_id %d added to the buffer.', message.data.pulse_id)
+            while running_event.is_set():
+                message = stream.receive(handler=handler.receive)
+
+                # This is just to know what is actually happening when the channels change shape.
+                if use_analyzer:
+                    try:
+                        BsreadStreamAnalyzer.analyze_extended_message(message)
+                    except Exception as e:
+                        _logger.error("Error while trying to analyze the message.", e)
+
+                # In case you set a receive timeout, the returned message can be None.
+                if message is None:
+                    continue
+
+                buffer.append(message)
+                _logger.debug('Message with pulse_id %d added to the buffer.', message.data.pulse_id)
+
+    except Exception as e:
+        running_event.clear()
+        _logger.error("Exception happened in buffer thread. Stopping buffer.", e)
 
 
-def send_bsread_message(output_port, buffer, mode=PUSH, buffer_timeout=0.01):
+def send_bsread_message(output_port, buffer, running_event, mode=PUSH, buffer_timeout=0.01):
 
     _logger.info("Output stream binding to port '%s'.", output_port)
 
-    with sender(port=output_port, mode=mode, queue_size=1) as output_stream:
+    try:
 
-        while True:
+        with sender(port=output_port, mode=mode, queue_size=1) as output_stream:
 
-            if len(buffer) == 0:
-                sleep(buffer_timeout)
-                continue
+            while running_event.is_set():
 
-            message = buffer.popleft()
+                if len(buffer) == 0:
+                    sleep(buffer_timeout)
+                    continue
 
-            data = {}
-            for value_name, bsread_value in message.data.data.items():
-                data[value_name] = bsread_value.value
+                message = buffer.popleft()
 
-            _logger.debug("Sending message with pulse_id '%s'.", message.data.pulse_id)
+                data = {}
+                for value_name, bsread_value in message.data.data.items():
+                    data[value_name] = bsread_value.value
 
-            output_stream.send(timestamp=(message.data.global_timestamp, message.data.global_timestamp_offset),
-                               pulse_id=message.data.pulse_id,
-                               data=data,
-                               check_data=True)
+                _logger.debug("Sending message with pulse_id '%s'.", message.data.pulse_id)
 
-            _logger.debug("Message with pulse_id '%s' forwarded.", message.data.pulse_id)
+                output_stream.send(timestamp=(message.data.global_timestamp, message.data.global_timestamp_offset),
+                                   pulse_id=message.data.pulse_id,
+                                   data=data,
+                                   check_data=True)
+
+                _logger.debug("Message with pulse_id '%s' forwarded.", message.data.pulse_id)
+
+    except Exception as e:
+        running_event.clear()
+        _logger.error("Exception happened in sending thread. Stopping buffer.", e)
 
 
-def start_server(channels, output_port, ring_buffer_length):
+def start_server(channels, output_port, ring_buffer_length, use_analyzer=False):
     _logger.info("Requesting stream with channels: %s", channels)
 
     stream_address = dispatcher.request_stream(channels)
@@ -73,8 +95,11 @@ def start_server(channels, output_port, ring_buffer_length):
 
     buffer = deque(maxlen=ring_buffer_length)
 
-    buffer_thread = Thread(target=buffer_bsread_messages, args=(stream_address, buffer))
-    send_thread = Thread(target=send_bsread_message, args=(output_port, buffer))
+    running_event = Event()
+    running_event.set()
+
+    buffer_thread = Thread(target=buffer_bsread_messages, args=(stream_address, buffer, running_event, use_analyzer))
+    send_thread = Thread(target=send_bsread_message, args=(output_port, buffer, running_event))
 
     buffer_thread.start()
     send_thread.start()
@@ -100,6 +125,8 @@ def run():
                         choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'],
                         help="Log level to use.")
 
+    parser.add_argument("--analyzer", action="store_true", help="Analyze the incoming stream for anomalies.")
+
     arguments = parser.parse_args()
 
     # Setup the logging level.
@@ -111,7 +138,8 @@ def run():
         file_lines = input_file.readlines()
         channels = [channel.strip() for channel in file_lines if not channel.strip().startswith("#") and channel.strip()]
 
-    start_server(channels=channels, output_port=arguments.output_port, ring_buffer_length=arguments.buffer_length)
+    start_server(channels=channels, output_port=arguments.output_port, ring_buffer_length=arguments.buffer_length,
+                 use_analyzer=arguments.analyzer)
 
 
 if __name__ == "__main__":
