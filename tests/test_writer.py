@@ -71,7 +71,8 @@ class TestBsreadWriter(unittest.TestCase):
         timestamp_offset = 0
 
         data = {"device1": 0,
-                "device2": 0}
+                "device2": 0,
+                "device3": None}
 
         with sender(port=self.stream_port, mode=PUSH, queue_size=1) as output_stream:
             for index in range(10):
