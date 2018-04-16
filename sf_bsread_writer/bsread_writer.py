@@ -39,7 +39,9 @@ class BsreadWriter(object):
         message_data = message.data
 
         if self.first_iteration and "data_header" in message_data:
+            self.prepare_format_datasets()
             self.prepare_datasets(message_data)
+
             self.first_iteration = False
 
         data = message_data['data']
@@ -52,43 +54,7 @@ class BsreadWriter(object):
         is_data_valid = [1 if data_point is not None else 0 for data_point in data]
         self.h5_writer.write(is_data_valid, dataset_group_name='is_data_present')
 
-    def prepare_datasets(self, message_data):
-
-        data_header = message_data['data_header']
-        _logger.debug("Data Header: ", data_header)
-
-        # Interpret the data header and add required datasets
-        for channel in data_header['channels']:
-            channel_type = channel.get('type')
-
-            group_name = '/data/' + channel['name'] + "/"
-
-            self.h5_writer.add_dataset(group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8')
-
-            self.h5_writer.add_dataset(group_name + 'is_data_present', dataset_group_name='is_data_present', dtype='u1')
-
-            if channel_type and channel_type.lower() == "string":
-                shape = [1]
-                maxshape = [None]
-                dtype = h5py.special_dtype(vlen=str)
-
-                self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
-                                           maxshape=maxshape, dtype=dtype)
-
-            else:
-
-                dtype = channel_type_deserializer_mapping[channel_type][0]
-
-                if 'shape' in channel:
-                    # H5 is slowest dimension first, but bsread is fastest dimension first.
-                    shape = [1] + channel['shape'][::-1]
-                    maxshape = [None] + channel['shape'][::-1]
-
-                    self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
-                                               maxshape=maxshape, dtype=dtype)
-                else:
-                    self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', dtype=dtype)
-
+    def prepare_format_datasets(self):
         self.h5_writer.file.create_dataset("/general/created",
                                            data=numpy.string_(self.parameters["general/created"]))
 
@@ -100,6 +66,48 @@ class BsreadWriter(object):
 
         self.h5_writer.file.create_dataset("/general/user",
                                            data=numpy.string_(self.parameters["general/user"]))
+
+    def _prepare_channel_dataset(self, channel_definition):
+        name = channel_definition['name']
+        dtype = channel_definition.get('type')
+        shape = channel_definition.get('shape')
+
+        group_name = '/data/' + name + "/"
+
+        self.h5_writer.add_dataset(group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8')
+        self.h5_writer.add_dataset(group_name + 'is_data_present', dataset_group_name='is_data_present', dtype='u1')
+
+        if dtype and dtype.lower() == "string":
+            shape = [1]
+            maxshape = [None]
+            dtype = h5py.special_dtype(vlen=str)
+
+            self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
+                                       maxshape=maxshape, dtype=dtype)
+
+        else:
+
+            dtype = channel_type_deserializer_mapping[dtype][0]
+
+            if shape is not None:
+                # H5 is slowest dimension first, but bsread is fastest dimension first.
+                shape = [1] + shape[::-1]
+                maxshape = [None] + shape[::-1]
+
+                self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
+                                           maxshape=maxshape, dtype=dtype)
+            else:
+                self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', dtype=dtype)
+
+    def prepare_datasets(self, message_data):
+
+        data_header = message_data['data_header']
+
+        _logger.debug("Data Header: ", data_header)
+
+        # Interpret the data header and add required datasets
+        for index, channel_definition in enumerate(data_header['channels']):
+            self._prepare_channel_dataset(channel_definition)
 
     def close(self):
         self.h5_writer.close_file()
