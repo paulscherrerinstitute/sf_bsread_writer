@@ -23,6 +23,7 @@ class BsreadWriter(object):
         self.h5_writer = Writer()
         self.h5_writer.open_file(self.output_file)
 
+        self.cached_channel_definitions = None
         self.first_iteration = True
 
     def prune_and_close(self, stop_pulse_id):
@@ -35,14 +36,64 @@ class BsreadWriter(object):
 
         self.close()
 
+    def verify_datasets(self, message_data):
+
+        # Data header is present in the message only when it has changed (or first message).
+        if "data_header" not in message_data:
+            return
+
+        _logger.info("Data header change detected.")
+
+        data_header = message_data['data_header']
+        data_values = message_data["data"]
+        n_channels = len(data_header['channels'])
+
+        if self.first_iteration:
+            self.prepare_format_datasets()
+
+            n_channels = len(data_header['channels'])
+            self.cached_channel_definitions = [None] * n_channels
+
+            self.first_iteration = False
+
+        if n_channels != len(self.cached_channel_definitions):
+            raise ValueError("Number of channels in the stream changed."
+                             "\nOriginal channels: %s\nNew data header: %s" %
+                             (self.cached_channel_definitions, data_header))
+
+        # Interpret the data header and add required datasets
+        for channel_index, channel_definition in enumerate(data_header['channels']):
+
+            channel_name = channel_definition['name']
+            channel_value = data_values[channel_index]
+
+            channel_group_name = '/data/' + channel_name + "/"
+
+            # New channel.
+            if self.cached_channel_definitions[channel_index] is None:
+
+                _logger.debug("Creating datasets for channel_name '%s' at index %d.", channel_name, channel_index)
+
+                self.h5_writer.add_dataset(channel_group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8')
+                self.h5_writer.add_dataset(channel_group_name + 'is_data_present', dataset_group_name='is_data_present',
+                                           dtype='u1')
+
+                self._setup_channel_data_dataset(channel_group_name, channel_index, channel_definition, channel_value)
+
+            # A channel change counts only when data is present - otherwise we are not sure if data header is correct.
+            elif channel_value is not None and self.cached_channel_definitions[channel_index] != channel_definition:
+
+                _logger.info("Channel definition changed for channel_name '%s'."
+                             "\nOld definition: %s\nNew definition%s.",
+                             channel_name, self.cached_channel_definitions[channel_index], channel_definition)
+
+                self._modify_channel_data_dataset(channel_index, channel_definition)
+
+
     def write_message(self, message):
         message_data = message.data
 
-        if self.first_iteration and "data_header" in message_data:
-            self.prepare_format_datasets()
-            self.prepare_datasets(message_data)
-
-            self.first_iteration = False
+        self.verify_datasets(message_data)
 
         data = message_data['data']
 
@@ -55,6 +106,9 @@ class BsreadWriter(object):
         self.h5_writer.write(is_data_valid, dataset_group_name='is_data_present')
 
     def prepare_format_datasets(self):
+
+        _logger.info("Initializing format datasets.")
+
         self.h5_writer.file.create_dataset("/general/created",
                                            data=numpy.string_(self.parameters["general/created"]))
 
@@ -67,54 +121,52 @@ class BsreadWriter(object):
         self.h5_writer.file.create_dataset("/general/user",
                                            data=numpy.string_(self.parameters["general/user"]))
 
-    def _prepare_channel_dataset(self, channel_definition):
-        name = channel_definition['name']
-        dtype = channel_definition.get('type')
-        shape = channel_definition.get('shape')
+    def _get_channel_data_dataset_definition(self, channel_definition):
 
-        group_name = '/data/' + name + "/"
+        type_name = channel_definition.get('type', "float64")
+        shape = channel_definition.get('shape', [1])
 
-        self.h5_writer.add_dataset(group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8')
-        self.h5_writer.add_dataset(group_name + 'is_data_present', dataset_group_name='is_data_present', dtype='u1')
+        dataset_shape = [1] + shape[::-1]
+        dataset_max_shape = [None] + shape[::-1]
+        dataset_type = channel_type_deserializer_mapping[type_name][0]
 
-        if dtype and dtype.lower() == "string":
-            shape = [1]
-            maxshape = [None]
-            dtype = h5py.special_dtype(vlen=str)
+        if type_name == "string":
+            dataset_shape = [1]
+            dataset_max_shape = [None]
+            dataset_type = h5py.special_dtype(vlen=str)
 
-            self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
-                                       maxshape=maxshape, dtype=dtype)
+        return dataset_type, dataset_shape, dataset_max_shape
+
+    def _setup_channel_data_dataset(self, channel_group_name, channel_index, channel_definition, channel_value):
+
+        # If we do not have a channel value we cannot be sure that the header is correct or just default.
+        if channel_value is None:
+            _logger.info("No data for channel_name '%s' was received. Creating dataset stub.",
+                         channel_definition['name'])
+
+            self.h5_writer.add_dataset_stub(dataset_group_name='data')
+
+            self.cached_channel_definitions[channel_index] = {}
 
         else:
+            dtype, dataset_shape, dataset_max_shape = self._get_channel_data_dataset_definition(channel_definition)
 
-            dtype = channel_type_deserializer_mapping[dtype][0]
+            self.h5_writer.add_dataset(channel_group_name + 'data', dataset_group_name='data', shape=dataset_shape,
+                                       maxshape=dataset_max_shape, dtype=dtype)
 
-            if shape is not None:
-                # H5 is slowest dimension first, but bsread is fastest dimension first.
-                shape = [1] + shape[::-1]
-                maxshape = [None] + shape[::-1]
+            self.cached_channel_definitions[channel_index] = channel_definition
 
-                self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', shape=shape,
-                                           maxshape=maxshape, dtype=dtype)
-            else:
-                self.h5_writer.add_dataset(group_name + "data", dataset_group_name='data', dtype=dtype)
+    def _modify_channel_data_dataset(self, channel_index, channel_definition):
+        raise NotImplementedError("Cannot dynamically change definition.")
 
-    def prepare_datasets(self, message_data):
-
-        data_header = message_data['data_header']
-
-        _logger.debug("Data Header: ", data_header)
-
-        # Interpret the data header and add required datasets
-        for index, channel_definition in enumerate(data_header['channels']):
-            self._prepare_channel_dataset(channel_definition)
+    def _convert_channel_data_dataset(self, channel_index, channel_definition, channel_value):
+        pass
 
     def close(self):
         self.h5_writer.close_file()
 
 
 class BsreadWriterManager(object):
-
     REQUIRED_PARAMETERS = ["general/created", "general/user", "general/process", "general/instrument"]
 
     def __init__(self, stream_address, output_file, receive_timeout=1000, mode=PULL):
@@ -256,7 +308,6 @@ class BsreadWriterManager(object):
 
 
 def register_rest_interface(app, manager):
-
     @app.get("/status")
     def get_status():
         return {"state": "ok",
@@ -272,7 +323,6 @@ def register_rest_interface(app, manager):
 
     @app.get("/stop")
     def stop():
-
         manager.stop()
 
         return {"state": "ok",
