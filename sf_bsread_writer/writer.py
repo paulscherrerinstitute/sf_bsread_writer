@@ -244,7 +244,7 @@ def start_server(stream_address, output_file, user_id, rest_port):
 
 
 def run():
-    parser = argparse.ArgumentParser(description='bsread buffer')
+    parser = argparse.ArgumentParser(description='bsread writer')
 
     parser.add_argument("stream_address", help="Address of the stream to connect to.")
     parser.add_argument("output_file", help="File where to write the bsread stream.")
