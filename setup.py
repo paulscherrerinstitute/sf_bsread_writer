@@ -6,7 +6,7 @@ setup(name="sf_bsread_writer",
       maintainer_email="daq@psi.ch",
       author="Paul Scherrer Institute",
       author_email="daq@psi.ch",
-      description="SwissFEL Jungfrau detector integration",
+      description="SwissFEL Bsread Writer",
 
       license="GPL3",
 
