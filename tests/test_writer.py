@@ -38,8 +38,10 @@ class TestBsreadWriter(unittest.TestCase):
         except:
             pass
 
+        os.remove(self.output_file)
+
         # Wait for the server to die.
-        sleep(1)
+        sleep(0.5)
 
     def test_classic_interaction(self):
         response = requests.get(self.rest_url + "status").json()
