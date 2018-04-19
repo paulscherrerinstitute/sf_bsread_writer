@@ -19,8 +19,8 @@ requirements:
 
 build:
   entry_points:
-    - sf_bsread_writer = sf_bsread_writer.start_server:run
-    - sf_bsread_buffer = sf_bsread_writer.start_server:run
+    - sf_bsread_writer = sf_bsread_writer.writer:run
+    - sf_bsread_buffer = sf_bsread_writer.buffer:run
 
 about:
     home:
