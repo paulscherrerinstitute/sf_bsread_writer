@@ -59,6 +59,68 @@ conda config --add channels paulscherrerinstitute
 
 <a id="running_the_servers"></a>
 ## Running the servers
+There are 2 components to this repository:
+
+- Buffer
+- Writer
+
+The buffer is meant to be a service that is permanently running, while the writer is started every time you want to 
+write some messages to disk.
+
+### Buffer
+
+Start the buffer in the background, preferably as a systemd service. The buffer will shutdown every time there is an 
+error it cannot recover from - it is best to have it on auto restart.
+
+```bash
+sf_bsread_buffer -h
+
+usage: sf_bsread_buffer [-h] [-c CHANNELS_FILE] [-o OUTPUT_PORT] [-b BUFFER_LENGTH]
+                        [--log_level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
+                        [--analyzer]
+
+bsread buffer
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c CHANNELS_FILE, --channels_file CHANNELS_FILE
+                        JSON file with channels to buffer.
+  -o OUTPUT_PORT, --output_port OUTPUT_PORT
+                        Port to bind the output stream to.
+  -b BUFFER_LENGTH, --buffer_length BUFFER_LENGTH
+                        Length of the ring buffer.
+  --log_level {CRITICAL,ERROR,WARNING,INFO,DEBUG}
+                        Log level to use.
+  --analyzer            Analyze the incoming stream for anomalies.
+```
+
+### Writer
+
+Start the writer every time you want some data to be collected from the buffer and written to disk. This step is 
+usually part of the DAQ system.
+
+It is important to note that the writer process is a "single usage" process - you start it, it writes down what you 
+requested, and then it shuts down. You have to start the process for each acquisition you want to make.
+
+```bash
+sf_bsread_writer -h
+usage: sf_bsread_writer [-h] [--log_level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
+                        stream_address output_file user_id rest_port
+
+bsread writer
+
+positional arguments:
+  stream_address        Address of the stream to connect to.
+  output_file           File where to write the bsread stream.
+  user_id               user_id under which to run the writer process.Use -1
+                        for current user.
+  rest_port             Port for REST api.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --log_level {CRITICAL,ERROR,WARNING,INFO,DEBUG}
+                        Log level to use.
+```
 
 <a id="web_interface"></a>
 ## Web interface
