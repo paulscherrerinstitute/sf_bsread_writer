@@ -80,7 +80,7 @@ class BsreadH5Writer(object):
                              "\nOld definition: %s\nNew definition%s.",
                              channel_name, self.cached_channel_definitions[channel_index], channel_definition)
 
-                self._modify_channel_data_dataset(channel_index, channel_definition)
+                self._modify_channel_data_dataset(channel_group_name, channel_index, channel_definition)
 
     def write_message(self, message):
         message_data = message.data
@@ -148,11 +148,17 @@ class BsreadH5Writer(object):
 
             self.cached_channel_definitions[channel_index] = channel_definition
 
-    def _modify_channel_data_dataset(self, channel_index, channel_definition):
-        raise NotImplementedError("Cannot dynamically change definition.")
+    def _modify_channel_data_dataset(self, channel_group_name, channel_index, channel_definition):
 
-    def _convert_channel_data_dataset(self, channel_index, channel_definition, channel_value):
-        pass
+        dtype, dataset_shape, dataset_max_shape = self._get_channel_data_dataset_definition(channel_definition)
+
+        self.h5_writer.replace_dataset(dataset_group_name="data",
+                                       dataset_name=channel_group_name + "data",
+                                       dtype=dtype,
+                                       shape=dataset_shape,
+                                       maxshape=dataset_max_shape)
+
+        self.cached_channel_definitions[channel_index] = channel_definition
 
     def close(self):
         self.h5_writer.close_file()

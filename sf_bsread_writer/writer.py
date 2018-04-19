@@ -8,7 +8,7 @@ import os
 from bsread import PULL, source, json
 from bsread.handlers import extended
 
-from sf_bsread_writer.bsread_h5_writer import BsreadH5Writer
+from sf_bsread_writer.writer_format import BsreadH5Writer
 
 _logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ import os
 import requests
 from bsread.sender import sender, PUSH
 
-from sf_bsread_writer import bsread_writer
+from sf_bsread_writer import writer
 
 
 class TestBsreadWriter(unittest.TestCase):
@@ -18,10 +18,10 @@ class TestBsreadWriter(unittest.TestCase):
         self.stream_port = 12345
         self.output_file = "ignore_bsread.h5"
 
-        self.writer_process = Process(target=bsread_writer.start_server, args=("tcp://127.0.0.1:%d" % self.stream_port,
-                                                                               self.output_file,
-                                                                               -1,
-                                                                               self.rest_port))
+        self.writer_process = Process(target=writer.start_server, args=("tcp://127.0.0.1:%d" % self.stream_port,
+                                                                        self.output_file,
+                                                                        -1,
+                                                                        self.rest_port))
 
         self.rest_url = "http://localhost:%d/" % self.rest_port
         self.writer_process.start()
