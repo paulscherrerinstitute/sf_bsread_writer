@@ -8,6 +8,9 @@ from bsread.writer import Writer
 _logger = logging.getLogger(__name__)
 
 
+DATA_DATASET_NAME = "data"
+
+
 class BsreadH5Writer(object):
     def __init__(self, output_file, parameters):
         self.output_file = output_file
@@ -136,7 +139,8 @@ class BsreadH5Writer(object):
             _logger.info("No data for channel_name '%s' was received. Creating dataset stub.",
                          channel_definition['name'])
 
-            self.h5_writer.add_dataset_stub(dataset_group_name='data')
+            self.h5_writer.add_dataset_stub(dataset_group_name='data',
+                                            dataset_name=channel_group_name + DATA_DATASET_NAME)
 
             self.cached_channel_definitions[channel_index] = {}
 
@@ -153,7 +157,7 @@ class BsreadH5Writer(object):
         dtype, dataset_shape, dataset_max_shape = self._get_channel_data_dataset_definition(channel_definition)
 
         self.h5_writer.replace_dataset(dataset_group_name="data",
-                                       dataset_name=channel_group_name + "data",
+                                       dataset_name=channel_group_name + DATA_DATASET_NAME,
                                        dtype=dtype,
                                        shape=dataset_shape,
                                        maxshape=dataset_max_shape)
