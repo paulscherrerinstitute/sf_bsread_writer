@@ -20,7 +20,8 @@ class TestWriterFormat(unittest.TestCase):
                          "general/user": "no, thank you"}
 
     def setUp(self):
-        pass
+        self.handler = extended.Handler()
+        self.writer = BsreadH5Writer(self.OUTPUT_FILE, self.WRITER_PARAMETERS)
 
     def tearDown(self):
         try:
@@ -30,9 +31,6 @@ class TestWriterFormat(unittest.TestCase):
 
     def test_start_missing_header(self):
 
-        handler = extended.Handler()
-        writer = BsreadH5Writer(self.OUTPUT_FILE, self.WRITER_PARAMETERS)
-
         with sender(port=self.STREAM_PORT) as output_stream:
             with source(host="localhost", port=self.STREAM_PORT) as input_stream:
 
@@ -41,16 +39,16 @@ class TestWriterFormat(unittest.TestCase):
                             "slow_source": None}
 
                     output_stream.send(data=data)
-                    writer.write_message(input_stream.receive(handler=handler.receive))
+                    self.writer.write_message(input_stream.receive(handler=self.handler.receive))
 
                 for index in range(10, 20):
                     data = {"fast_source": index,
                             "slow_source": index}
 
                     output_stream.send(data=data)
-                    writer.write_message(input_stream.receive(handler=handler.receive))
+                    self.writer.write_message(input_stream.receive(handler=self.handler.receive))
 
-        writer.close()
+        self.writer.close()
 
         file = h5py.File(self.OUTPUT_FILE)
 
@@ -64,5 +62,51 @@ class TestWriterFormat(unittest.TestCase):
 
         self.assertListEqual(list(slow_source[:10]), [0] * 10)
         self.assertListEqual(list(slow_source[10:]), list(range(10, 20)))
+
+        file.close()
+
+    def test_change_header(self):
+
+        with sender(port=self.STREAM_PORT) as output_stream:
+            with source(host="localhost", port=self.STREAM_PORT) as input_stream:
+
+                for index in range(10):
+                    data = {"scalar_source": index,
+                            "changing_source": index}
+
+                    output_stream.send(data=data)
+                    self.writer.write_message(input_stream.receive(handler=self.handler.receive))
+
+                for index in range(10, 20):
+                    data = {"scalar_source": index,
+                            "changing_source": [index, index, index]}
+
+                    output_stream.send(data=data)
+                    self.writer.write_message(input_stream.receive(handler=self.handler.receive))
+
+        self.writer.close()
+
+        file = h5py.File(self.OUTPUT_FILE)
+
+        scalar_source = file["/data/scalar_source/data"]
+        changing_source_1 = file["/data/changing_source/data(1)"]
+        changing_source_2 = file["/data/changing_source/data"]
+
+        self.assertIsNotNone(scalar_source)
+        self.assertIsNotNone(changing_source_1)
+        self.assertIsNotNone(changing_source_2)
+
+        self.assertEqual(len(scalar_source), 20)
+        self.assertEqual(len(changing_source_1), 10)
+        self.assertEqual(len(changing_source_2), 20)
+
+        self.assertListEqual(list(scalar_source), list(range(20)))
+        self.assertListEqual(list(changing_source_1[:10]), list(range(10)))
+
+        for index in range(10):
+            self.assertListEqual(list(changing_source_2[index]), [0] * 3)
+
+        for index in range(10, 20):
+            self.assertListEqual(list(changing_source_2[index]), [index] * 3)
 
         file.close()
