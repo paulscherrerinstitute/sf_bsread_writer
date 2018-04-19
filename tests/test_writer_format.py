@@ -59,3 +59,10 @@ class TestWriterFormat(unittest.TestCase):
 
         self.assertIsNotNone(fast_source)
         self.assertIsNotNone(slow_source)
+
+        self.assertListEqual(list(fast_source), list(range(20)))
+
+        self.assertListEqual(list(slow_source[:10]), [0] * 10)
+        self.assertListEqual(list(slow_source[10:]), list(range(10, 20)))
+
+        file.close()
