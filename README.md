@@ -63,6 +63,9 @@ conda config --add channels paulscherrerinstitute
 <a id="web_interface"></a>
 ## Web interface
 
+**WARNING**: Only the writer has a web interface - the buffer is just a service 
+running in the background with no interaction.
+
 All request (with the exception of **start\_pulse\_id**, **stop\_pulse\_id**, and **kill**) return a JSON 
 with the following fields:
 - **state** - \["ok", "error"\]
@@ -71,3 +74,23 @@ with the following fields:
 
 <a id="rest_api"></a>
 ### REST API
+In the API description, localhost and port 8888 are assumed. Please change this for your specific case.
+
+* `GET localhost:8888/status` - get the status of the writer.
+
+* `POST localhost:8888/parameters` - set parameters of the writer.
+    - Response specific field: "parameters" - Parameters you just set.  
+
+* `GET localhost:8888/stop` - stop the writer.
+
+* `GET localhost:8888/kill` - kill the writer process.
+    - Empty response.
+
+* `GET localhost:8888/statistics` - get writer process statistics.
+    - Response specific field: "statistics" - Data about the writer.
+
+* `PUT localhost:8888/start_pulse_id/<pulse_id>` - set first pulse_id to write to the output file.
+    - Empty response.
+
+* `PUT localhost:8888/stop_pulse_id/<pulse_id>` - set last pulse_id to write to the output file.
+    - Empty response.
