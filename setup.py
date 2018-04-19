@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name="sf_bsread_writer",
-      version="0.0.2",
+      version="1.0.0",
       maintainer="Paul Scherrer Institute",
       maintainer_email="daq@psi.ch",
       author="Paul Scherrer Institute",
