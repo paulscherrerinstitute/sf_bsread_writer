@@ -29,7 +29,7 @@ class BsreadH5Writer(object):
 
         self.close()
 
-    def verify_datasets(self, message_data):
+    def _verify_datasets(self, message_data):
 
         # Data header is present in the message only when it has changed (or first message).
         if "data_header" not in message_data:
@@ -42,7 +42,7 @@ class BsreadH5Writer(object):
         n_channels = len(data_header['channels'])
 
         if self.first_iteration:
-            self.prepare_format_datasets()
+            self._prepare_format_datasets()
 
             n_channels = len(data_header['channels'])
             self.cached_channel_definitions = [None] * n_channels
@@ -85,7 +85,7 @@ class BsreadH5Writer(object):
     def write_message(self, message):
         message_data = message.data
 
-        self.verify_datasets(message_data)
+        self._verify_datasets(message_data)
 
         data = message_data['data']
 
@@ -97,7 +97,7 @@ class BsreadH5Writer(object):
         is_data_valid = [1 if data_point is not None else 0 for data_point in data]
         self.h5_writer.write(is_data_valid, dataset_group_name='is_data_present')
 
-    def prepare_format_datasets(self):
+    def _prepare_format_datasets(self):
 
         _logger.info("Initializing format datasets.")
 
