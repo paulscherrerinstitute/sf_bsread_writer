@@ -8,7 +8,7 @@ from bsread import source, dispatcher
 from bsread.handlers import extended
 from bsread.sender import sender, PUSH, SUB
 
-from tests.bsread_analyzer import BsreadStreamAnalyzer
+from sf_bsread_writer.buffer_analyzer import analyze_message
 
 _logger = logging.getLogger(__name__)
 
@@ -33,16 +33,12 @@ def buffer_bsread_messages(stream_address, buffer, running_event, use_analyzer=F
             while running_event.is_set():
                 message = stream.receive(handler=handler.receive)
 
-                # This is just to know what is actually happening when the channels change shape.
-                if use_analyzer:
-                    try:
-                        BsreadStreamAnalyzer.analyze_extended_message(message)
-                    except Exception as e:
-                        _logger.error("Error while trying to analyze the message.", e)
-
                 # In case you set a receive timeout, the returned message can be None.
                 if message is None:
                     continue
+
+                if use_analyzer:
+                    analyze_message(message)
 
                 buffer.append(message)
                 _logger.debug('Message with pulse_id %d added to the buffer.', message.data.pulse_id)
