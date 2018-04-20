@@ -21,6 +21,7 @@ class BsreadH5Writer(object):
 
         self.cached_channel_definitions = None
         self.first_iteration = True
+        self.data_header_hash = None
 
     def prune_and_close(self, stop_pulse_id):
         # TODO: Prune.
@@ -36,11 +37,10 @@ class BsreadH5Writer(object):
 
         # Data header is present in the message only when it has changed (or first message).
         if "data_header" not in message_data:
-            return
-
-        _logger.info("Data header change detected.")
+            raise ValueError("Data header not present in message: %s", message_data)
 
         data_header = message_data['data_header']
+        data_header_hash = message_data["header"]["hash"]
         data_values = message_data["data"]
         n_channels = len(data_header['channels'])
 
@@ -56,6 +56,13 @@ class BsreadH5Writer(object):
             raise ValueError("Number of channels in the stream changed."
                              "\nOriginal channels: %s\nNew data header: %s" %
                              (self.cached_channel_definitions, data_header))
+
+        # Nothing to do if the data header is the same.
+        if self.data_header_hash == message_data["header"]["hash"]:
+            return
+
+        _logger.info("Data header change detected.")
+        self.data_header_hash = data_header_hash
 
         # Interpret the data header and add required datasets
         for channel_index, channel_definition in enumerate(data_header['channels']):
