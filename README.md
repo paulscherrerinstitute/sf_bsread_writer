@@ -15,6 +15,33 @@ Buffering and writing solution for bsread data in SwissFEL DAQ system.
 <a id="quick_start"></a>
 ## Quick start
 
+The project is made up of 2 parts:
+
+- Buffer service (buffer the incoming messages)
+- Writer process (write the desired messages from the buffer)
+
+Due to a relatively high start lag in getting bsread data, connecting to the sources when the DAQ system is triggered 
+does not work (you miss the first few messages). If, for example, the detector starts getting images with pulse_id 100,
+bsread would start getting messages with pulse_id 120 (the actual gap varies based on the repetition rate). 
+We need bsread messages from pulse_id 100 on to be stored together with the detector images, 
+this is why we buffer all the messages all the time.
+
+For info on how to run the buffer and writer, please see [Running the servers](#running_the_servers).
+
+### Buffer service
+The buffer service is running in the background. It accepts a list of channels to buffer - if you want to change the 
+list of channels, you have to modify the config file, and restart the buffer. Using **systemd** for running the 
+service is recommended.
+
+The buffer sends out buffered messages to whoever it connects to its output port.
+
+### Writer process
+The writer process is lunched and stopped once per DAQ acquisition. It connects to the buffer service and starts 
+writing messages to disk from the specified start_pulse_id until the specified stop_pulse_id.
+You specify this 2 parameters by calling its REST Api (see [REST API](#rest_api)).
+
+The writer uses the SwissFEL specific file format.
+
 <a id="build"></a>
 ## Build
 
