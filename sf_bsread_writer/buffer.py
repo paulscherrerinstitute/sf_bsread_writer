@@ -5,7 +5,6 @@ from threading import Thread, Event
 from time import sleep
 
 from bsread import source, dispatcher
-from bsread.handlers import extended
 from bsread.sender import sender, PUSH, SUB
 
 from sf_bsread_writer.buffer_analyzer import analyze_message
@@ -26,12 +25,10 @@ def buffer_bsread_messages(stream_address, buffer, running_event, use_analyzer=F
 
         _logger.info("Input stream host '%s' and port '%s'.", source_host, source_port)
 
-        handler = extended.Handler()
-
         with source(host=source_host, port=source_port, mode=mode, receive_timeout=receive_timeout) as stream:
 
             while running_event.is_set():
-                message = stream.receive(handler=handler.receive)
+                message = stream.receive()
 
                 # In case you set a receive timeout, the returned message can be None.
                 if message is None:
