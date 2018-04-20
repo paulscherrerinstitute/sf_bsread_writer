@@ -38,7 +38,10 @@ class TestBsreadWriter(unittest.TestCase):
         except:
             pass
 
-        os.remove(self.output_file)
+        try:
+            os.remove(self.output_file)
+        except:
+            pass
 
         # Wait for the server to die.
         sleep(0.5)
