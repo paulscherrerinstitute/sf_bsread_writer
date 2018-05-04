@@ -12,7 +12,7 @@ from sf_bsread_writer.buffer_analyzer import analyze_message
 _logger = logging.getLogger(__name__)
 
 
-def buffer_bsread_messages(stream_address, buffer, running_event, use_analyzer=False, receive_timeout=1000, mode=SUB):
+def buffer_bsread_messages(stream_address, message_buffer, running_event, use_analyzer=False, receive_timeout=1000, mode=SUB):
 
     _logger.info("Input stream connecting to '%s'.", stream_address)
 
@@ -37,7 +37,7 @@ def buffer_bsread_messages(stream_address, buffer, running_event, use_analyzer=F
                 if use_analyzer:
                     analyze_message(message)
 
-                buffer.append(message)
+                message_buffer.append(message)
                 _logger.debug('Message with pulse_id %d added to the buffer.', message.data.pulse_id)
 
     except Exception as e:
@@ -45,7 +45,7 @@ def buffer_bsread_messages(stream_address, buffer, running_event, use_analyzer=F
         _logger.error("Exception happened in buffer thread. Stopping buffer.", e)
 
 
-def send_bsread_message(output_port, buffer, running_event, mode=PUSH, buffer_timeout=0.01):
+def send_bsread_message(output_port, message_buffer, running_event, mode=PUSH, buffer_timeout=0.01):
 
     _logger.info("Output stream binding to port '%s'.", output_port)
 
@@ -55,11 +55,11 @@ def send_bsread_message(output_port, buffer, running_event, mode=PUSH, buffer_ti
 
             while running_event.is_set():
 
-                if len(buffer) == 0:
+                if len(message_buffer) == 0:
                     sleep(buffer_timeout)
                     continue
 
-                message = buffer.popleft()
+                message = message_buffer.popleft()
 
                 data = {}
                 for value_name, bsread_value in message.data.data.items():
@@ -86,13 +86,14 @@ def start_server(channels, output_port, ring_buffer_length, use_analyzer=False):
 
     _logger.debug("Received stream address '%s'", stream_address)
 
-    buffer = deque(maxlen=ring_buffer_length)
+    message_buffer = deque(maxlen=ring_buffer_length)
 
     running_event = Event()
     running_event.set()
 
-    buffer_thread = Thread(target=buffer_bsread_messages, args=(stream_address, buffer, running_event, use_analyzer))
-    send_thread = Thread(target=send_bsread_message, args=(output_port, buffer, running_event))
+    buffer_thread = Thread(target=buffer_bsread_messages, args=(stream_address, message_buffer,
+                                                                running_event, use_analyzer))
+    send_thread = Thread(target=send_bsread_message, args=(output_port, message_buffer, running_event))
 
     buffer_thread.start()
     send_thread.start()
