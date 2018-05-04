@@ -81,7 +81,8 @@ class TestBsreadWriter(unittest.TestCase):
 
                 source_stream.send(data=data)
 
-            for index in range(20, 30):
+            # 31, because the writer stops AFTER receiving the first message it should not write.
+            for index in range(20, 31):
                 data = {"normal_source": index,
                         "slow_source": None,
                         "changing_source": [index] * 3}
@@ -112,13 +113,10 @@ class TestBsreadWriter(unittest.TestCase):
         self.assertEqual(response["statistics"]["start_pulse_id"], 0)
         self.assertEqual(response["statistics"]["stop_pulse_id"], None)
 
-        # Wait for the writer to receive all messages.
-        sleep(1)
-
         requests.put(self.writer_rest_url + "stop_pulse_id/29")
 
         # Wait for the writer to terminate.
-        sleep(1)
+        sleep(1.5)
 
         self.assertFalse(self.writer_process.is_alive(), "Writer process should be dead by now.")
         self.assertTrue(self.buffer_process.is_alive(), "Buffer process should be still alive.")
@@ -133,4 +131,4 @@ class TestBsreadWriter(unittest.TestCase):
         self.assertEqual(len(normal_source), 30)
         self.assertEqual(len(slow_source), 30)
         self.assertEqual(len(changing_source_1), 10)
-        self.assertEqual(len(changing_source_2), 20)
+        self.assertEqual(len(changing_source_2), 30)
