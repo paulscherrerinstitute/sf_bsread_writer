@@ -1,4 +1,5 @@
 import logging
+from time import time
 
 import h5py
 import numpy
@@ -24,14 +25,11 @@ class BsreadH5Writer(object):
         self.data_header_hash = None
 
     def prune_and_close(self, stop_pulse_id):
-        # TODO: Prune.
-        # dset_pulse_id = h5_file['pulse_id']
-        # while dset_pulse_id[-1] > end_pulse_id:
-        #     # this will also discard the data
-        #     # see the Note at http://docs.h5py.org/en/latest/high/dataset.html#resizable-datasets
-        #     dset_pulse_id.resize(dset_pulse_id.shape[0] - 1, axis=0)
+        start_time = time()
+        _logger.info("Starting to close the file.")
 
         self.close()
+        _logger.info("File closed in %s seconds.", time() - start_time)
 
     def _verify_datasets(self, message_data):
 
