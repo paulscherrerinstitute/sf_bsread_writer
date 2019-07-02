@@ -38,6 +38,18 @@ def register_rest_interface(app, manager):
                 "status": manager.get_status(),
                 "statistics": manager.get_statistics()}
 
+    @app.put("/start_now")
+    def start_now():
+        _logger.info("Starting writer without pulse_id.")
+
+        manager.start_writer(None)
+
+    @app.put("/stop_now")
+    def stop_now():
+        _logger.info("Stopping writing without pulse_id.")
+
+        manager.stop_writer(None)
+
     @app.put("/start_pulse_id/<pulse_id>")
     def start_pulse_id(pulse_id):
         _logger.info("Received start_pulse_id %s.", pulse_id)
