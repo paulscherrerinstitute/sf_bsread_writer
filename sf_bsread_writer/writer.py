@@ -1,6 +1,7 @@
 import argparse
 import logging
 from threading import Event, Thread
+from time import time
 
 import bottle
 import os
@@ -34,10 +35,39 @@ class BsreadWriterManager(object):
         self._writing_thread = None
 
         self.start_pulse_id = None
-        self.stop_pulse_id = None
-        self.last_pulse_id = -1
+        self.start_timestamp = None
 
-    def write_stream(self, start_pulse_id):
+        self.stop_pulse_id = None
+        self.stop_timestamp = None
+
+        self.last_pulse_id = -1
+        self.last_timestamp = None
+
+    def _is_last_message_too_early(self):
+        if self.start_pulse_id is not None and self.last_pulse_id < self.start_pulse_id:
+            return True
+
+        elif self.stop_timestamp is not None and self.last_timestamp < self.stop_timestamp:
+            return True
+
+        return False
+
+    def _is_last_message_too_late(self):
+        if self.stop_pulse_id is not None and self.last_pulse_id > self.stop_pulse_id:
+            return True
+
+        elif self.stop_timestamp is not None and self.last_timestamp > self.stop_timestamp:
+            return True
+
+        return False
+
+    def _stop_writing(self, writer):
+        writer.prune_and_close(self.stop_pulse_id)
+
+        _logger.info("Stopping bsread writer at pulse_id: %d" % self.stop_pulse_id)
+        self._running_event.clear()
+
+    def write_stream(self, start_pulse_id, start_timestamp):
 
         source_host, source_port = self.stream_address.rsplit(":", maxsplit=1)
 
@@ -46,7 +76,11 @@ class BsreadWriterManager(object):
 
         _logger.info("Input stream host '%s' and port '%s'.", source_host, source_port)
 
-        _logger.info("First pulse_id to write: %d.", start_pulse_id)
+        if start_pulse_id is not None:
+            _logger.info("First pulse_id to write: %d.", start_pulse_id)
+
+        if start_timestamp is not None:
+            _logger.info("First message to write after timestamp %s.", start_timestamp)
 
         writer = BsreadH5Writer(self.output_file, self.parameters)
         handler = extended.Handler()
@@ -64,29 +98,29 @@ class BsreadWriterManager(object):
                 # In case you set a receive timeout, the returned message can be None.
                 if message is None:
 
-                    # If the current pulse_id is above the stop_pulse_id, stop the recording.
-                    if self.stop_pulse_id is not None and self.last_pulse_id > self.stop_pulse_id:
-                        writer.prune_and_close(self.stop_pulse_id)
-
-                        _logger.info("Stopping bsread writer at pulse_id: %d" % self.stop_pulse_id)
-                        self._running_event.clear()
+                    # In case the stop_pulse_id was set after the camera stream has ended.
+                    if self._is_last_message_too_late():
+                        self._stop_writing(writer)
 
                     continue
 
                 self.last_pulse_id = message.data["header"]["pulse_id"]
-                _logger.debug('Received message with pulse_id %d.', self.last_pulse_id)
 
-                # If this pulse_id was generated before the first detector image, discard it.
-                if self.last_pulse_id < start_pulse_id:
-                    _logger.debug("Discarding message with pulse_id %d (before start_pulse_id).", self.last_pulse_id)
+                self.last_timestamp = message.data["header"]["global_timestamp"]["sec"]
+                self.last_timestamp += 1e-9 * message.data["header"]["global_timestamp"]["ns"]
+
+                _logger.debug('Received message with pulse_id %d and timestamp %s.',
+                              self.last_pulse_id, self.last_timestamp)
+
+                if self._is_last_message_too_early():
+                    _logger.debug("Discarding early messages with pulse_id=%s (start_pulse_id=%s) "
+                                  "and timestamp=%s (start_timestamp=%s)",
+                                  self.last_pulse_id, self.start_pulse_id,
+                                  self.last_timestamp, self.start_timestamp)
                     continue
 
-                # If the current pulse_id is above the stop_pulse_id, stop the recording.
-                if self.stop_pulse_id is not None and self.last_pulse_id > self.stop_pulse_id:
-                    writer.prune_and_close(self.stop_pulse_id)
-
-                    _logger.info("Stopping bsread writer at pulse_id: %d" % self.stop_pulse_id)
-                    self._running_event.clear()
+                if self._is_last_message_too_late():
+                    self._stop_writing(writer)
                     continue
 
                 writer.write_message(message)
@@ -133,9 +167,17 @@ class BsreadWriterManager(object):
 
         _logger.info("Starting to write with pulse_id %d." % pulse_id)
 
-        self.start_pulse_id = pulse_id
+        if pulse_id is None:
+            current_timestamp = time()
 
-        self._writing_thread = Thread(target=self.write_stream, args=(pulse_id,))
+            self.start_pulse_id = None
+            self.start_timestamp = current_timestamp
+
+        else:
+            self.start_pulse_id = pulse_id
+            self.start_timestamp = None
+
+        self._writing_thread = Thread(target=self.write_stream, args=(self.start_pulse_id, self.start_timestamp))
 
         self._running_event.clear()
 
@@ -147,12 +189,24 @@ class BsreadWriterManager(object):
 
     def stop_writer(self, pulse_id):
         _logger.info("Set stop_pulse_id=%d", pulse_id)
-        self.stop_pulse_id = pulse_id
+
+        if pulse_id is None:
+            current_timestamp = time()
+
+            self.stop_pulse_id = None
+            self.stop_timestamp = current_timestamp
+
+        else:
+            self.stop_pulse_id = pulse_id
+            self.stop_timestamp = None
 
     def get_statistics(self):
         return {"start_pulse_id": self.start_pulse_id,
                 "stop_pulse_id": self.stop_pulse_id,
-                "last_pulse_id": self.last_pulse_id}
+                "start_timestamp": self.start_timestamp,
+                "stop_timestamp": self.stop_timestamp,
+                "last_pulse_id": self.last_pulse_id,
+                "last_timestamp": self.last_timestamp}
 
 
 def start_server(stream_address, output_file, user_id, rest_port):
