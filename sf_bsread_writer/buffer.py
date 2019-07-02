@@ -111,7 +111,7 @@ def run():
 
     parser.add_argument("stream", help="Stream source in format tcp://127.0.0.1:10000")
 
-    parser.add_argument('-o', '--output_port', default=8082,
+    parser.add_argument('-o', '--output_port', type=int, default=8082,
                         help="Port to bind the output stream to.")
     parser.add_argument("-b", "--buffer_length", type=int, default=100,
                         help="Length of the ring buffer.")
