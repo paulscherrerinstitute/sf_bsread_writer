@@ -11,6 +11,7 @@ Buffering and writing solution for bsread data in SwissFEL DAQ system.
 3. [Running the servers](#running_the_servers)
 4. [Web interface](#web_interface)
     1. [REST API](#rest_api)
+5. [Manual test and function demo](#manual_test)
 
 <a id="quick_start"></a>
 ## Quick start
@@ -192,3 +193,137 @@ In the API description, localhost and port 8888 are assumed. Please change this 
 
 * `PUT localhost:8888/stop_now` - stop the acquisition and discard messages after the current timestamp.
     - Empty response.
+    
+<a id="manual_test"></a>
+## Manual test and function demo
+
+This is just a procedure you can do to better understand the moving parts of this project. You start by first cloning 
+the project and having the needed libraries in your Python path. The easiest is to do it on SF consoles, and loading 
+our default Python environment.
+
+You will need 3 consoles for this test, you can also do it in 1, but you will need to be a bit more flexible 
+with the outputs.
+
+Pick your preferred camera and get the stream address from it (BSREADCONFIG PV):
+
+```bash
+caget SLG-LCAM-C041:BSREADCONFIG
+# SLG-LCAM-C041:BSREADCONFIG "tcp://daqsf-sioc-cs-01:8050"
+```
+
+You will receive the stream address on the ZMQ network - you probably do not have access to this from the consoles,
+so for this test we will remove the "daq" from the "daqsf" part.
+
+
+### First console: Buffer
+
+From the root of the cloned project:
+
+```bash
+export PYTHONPATH=`pwd`
+
+# Connect to stream discovered above, use port 12300 to stream images out, and the buffer should have 100 elements (4s)
+python sf_bsread_writer/buffer.py tcp://sf-sioc-cs-01:8050 -o 12300 -b 100 --log_level DEBUG
+
+# The expected output....
+[INFO] Connecting to stream 'tcp://sf-sioc-cs-01:8050'.
+[INFO] Requesting stream from: tcp://sf-sioc-cs-01:8050
+[INFO] Input stream connecting to 'tcp://sf-sioc-cs-01:8050'.
+[INFO] Input stream host 'sf-sioc-cs-01' and port '8050'.
+[2019-07-02 18:00:06,028][mflow.mflow][INFO] Connected to tcp://sf-sioc-cs-01:8050
+[INFO] Connected to tcp://sf-sioc-cs-01:8050
+[2019-07-02 18:00:06,028][mflow.mflow][INFO] Receive timeout set: 1000.000000
+[INFO] Receive timeout set: 1000.000000
+[INFO] Output stream binding to port '12300'.
+[2019-07-02 18:00:06,030][mflow.mflow][INFO] Bound to tcp://*:12300
+[INFO] Started listening to the stream.
+[INFO] Bound to tcp://*:12300
+[DEBUG] Message with pulse_id 9066880403 and timestamp 1562083206.748058 added to the buffer.
+[DEBUG] Sending message with pulse_id '9066880403'.
+[DEBUG] Update channel metadata.
+[DEBUG] Message with pulse_id 9066880503 and timestamp 1562083207.6237204 added to the buffer.
+[DEBUG] Message with pulse_id 9066880603 and timestamp 1562083208.5736806 added to the buffer.
+[DEBUG] Message with pulse_id 9066880703 and timestamp 1562083209.5877638 added to the buffer.
+[DEBUG] Message with pulse_id 9066880803 and timestamp 1562083210.6012282 added to the buffer.
+```
+
+This started the buffer. Let it run - in a real world situation this would be started as a systemd service.
+
+### Second console: Writer
+
+A writer instance needs to be started for each file we want to write. It works the same way as the detector writer.
+
+From the root of the cloned project:
+
+```bash
+export PYTHONPATH=`pwd`
+
+# Start the writer, connect to 12300 to get images, write works.h5, 
+# -1=="do not change current user", REST Api on port 4000 
+python sf_bsread_writer/writer.py tcp://127.0.0.1:12300 works.h5 -1 4000 --log_level=DEBUG
+
+# The expected output.....
+
+[INFO] __main__ - Starting writer manager with stream_address tcp://127.0.0.1:12300, output_file works.h5.
+[INFO] __main__ - Not changing process uid and gid.
+[INFO] __main__ - Writing output file to folder ''.
+[INFO] __main__ - Folder '' already exists.
+[INFO] __main__ - Starting rest API on port 4000.
+Bottle v0.12.13 server starting up (using WSGIRefServer())...
+Listening on http://127.0.0.1:4000/
+Hit Ctrl-C to quit.
+
+# At the end.. Once you executed the REST calls from the third console you will also get something like this ...
+
+127.0.0.1 - - [02/Jul/2019 18:35:54] "PUT /start_now HTTP/1.1" 200 0
+[INFO] sf_bsread_writer.writer_format - Initializing format datasets.
+[INFO] sf_bsread_writer.writer_format - Data header change detected.
+[INFO] sf_bsread_writer.writer_rest - Stopping writing without pulse_id.
+[INFO] __main__ - Set stop_pulse_id=None
+127.0.0.1 - - [02/Jul/2019 18:36:01] "PUT /stop_now HTTP/1.1" 200 0
+[INFO] sf_bsread_writer.writer_format - Starting to close the file.
+[INFO] bsread.writer - Compact data for dataset /data/SLG-LCAM-C041:FPICTURE/data from 1001 to 6
+[INFO] bsread.writer - Compact data for dataset /data/SLG-LCAM-C041:FPICTURE/pulse_id from 1001 to 6
+[INFO] bsread.writer - Compact data for dataset /data/SLG-LCAM-C041:FPICTURE/is_data_present from 1001 to 6
+[INFO] bsread.writer - Close file /
+[INFO] sf_bsread_writer.writer_format - File closed in 0.23509478569030762 seconds.
+[INFO] __main__ - Stopping bsread writer at pulse_id: None
+[2019-07-02 18:36:02,032][mflow.mflow][INFO] Disconnected
+[INFO] mflow.mflow - Disconnected
+[INFO] __main__ - Writing completed. Timestamp range from 1562085354.8176036 to 1562085361.4905198 written to file.
+
+```
+
+### Third console: Rest calls
+
+This is the most simple example, without knowing the pulse_id but by using the current timestamp.
+
+```bash
+curl -X PUT localhost:4000/start_now
+
+# Wait a couple of seconds.
+
+curl -X PUT localhost:4000/stop_now
+
+# You should find the file **works.h5** in the root folder of the git repo.
+ll
+# ...
+total 16M
+drwxr-xr-x 2 babic_a 2.0K Jul  2 17:41 conda-recipe
+-rw-r--r-- 1 babic_a 7.0K Jul  2 17:41 README.md
+-rw-r--r-- 1 babic_a  350 Jul  2 17:41 setup.py
+drwxr-xr-x 3 babic_a 2.0K Jul  2 18:35 sf_bsread_writer
+drwxr-xr-x 2 babic_a 2.0K Jul  2 17:41 tests
+-rw-r--r-- 1 babic_a  16M Jul  2 18:36 works.h5
+[sf-lc6a-64-06 sf_bsread_writer]$
+
+# Check if you image is in the file.
+h5ls works.h5/data/SLG-LCAM-C041:FPICTURE
+# ...
+data                     Dataset {6/Inf, 1024, 1280}
+is_data_present          Dataset {6/Inf}
+pulse_id                 Dataset {6/Inf}
+
+```
+
+Once you call **stop** on the writer, the file will be closed and the process will terminate.
