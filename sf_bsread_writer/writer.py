@@ -47,7 +47,7 @@ class BsreadWriterManager(object):
         if self.start_pulse_id is not None and self.last_pulse_id < self.start_pulse_id:
             return True
 
-        elif self.stop_timestamp is not None and self.last_timestamp < self.stop_timestamp:
+        elif self.stop_timestamp is not None and self.last_timestamp < self.start_timestamp:
             return True
 
         return False
