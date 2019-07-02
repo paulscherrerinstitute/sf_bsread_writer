@@ -5,7 +5,6 @@ from multiprocessing import Process
 from time import sleep
 
 import os
-from unittest.mock import Mock
 
 import h5py
 import requests
@@ -26,11 +25,9 @@ class TestBsreadWriter(unittest.TestCase):
         self.buffer_stream_port = 9999
         self.buffer_stream_address = "tcp://localhost:%d" % self.buffer_stream_port
 
-        mock_request_stream = Mock()
-        mock_request_stream.return_value = self.buffer_stream_address
-        dispatcher.request_stream = mock_request_stream
-
-        self.buffer_process = Process(target=buffer.start_server, args=([], self.writer_stream_port, 100))
+        self.buffer_process = Process(target=buffer.start_server, args=(self.buffer_stream_address,
+                                                                        self.writer_stream_port,
+                                                                        100))
 
         self.writer_process = Process(target=writer.start_server, args=("tcp://127.0.0.1:%d" % self.writer_stream_port,
                                                                         self.writer_output_file,

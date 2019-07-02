@@ -2,9 +2,9 @@ import argparse
 import logging
 from collections import deque
 from threading import Thread, Event
-from time import sleep
+from time import sleep, time
 
-from bsread import source, dispatcher
+from bsread import source
 from bsread.sender import sender, PUSH, SUB
 
 from sf_bsread_writer.buffer_analyzer import analyze_message
@@ -34,11 +34,15 @@ def buffer_bsread_messages(stream_address, message_buffer, running_event, use_an
                 if message is None:
                     continue
 
+                message_timestamp = time()
+
                 if use_analyzer:
                     analyze_message(message)
 
-                message_buffer.append(message)
-                _logger.debug('Message with pulse_id %d added to the buffer.', message.data.pulse_id)
+                message_buffer.append((message, message_timestamp))
+
+                _logger.debug('Message with pulse_id %d and timestamp %s added to the buffer.',
+                              message.data.pulse_id, message_timestamp)
 
     except Exception as e:
         running_event.clear()
@@ -59,7 +63,7 @@ def send_bsread_message(output_port, message_buffer, running_event, mode=PUSH, b
                     sleep(buffer_timeout)
                     continue
 
-                message = message_buffer.popleft()
+                message, message_timestamp = message_buffer.popleft()
 
                 data = {}
                 for value_name, bsread_value in message.data.data.items():
@@ -67,7 +71,7 @@ def send_bsread_message(output_port, message_buffer, running_event, mode=PUSH, b
 
                 _logger.debug("Sending message with pulse_id '%s'.", message.data.pulse_id)
 
-                output_stream.send(timestamp=(message.data.global_timestamp, message.data.global_timestamp_offset),
+                output_stream.send(timestamp=message_timestamp,
                                    pulse_id=message.data.pulse_id,
                                    data=data,
                                    check_data=True)
@@ -79,12 +83,8 @@ def send_bsread_message(output_port, message_buffer, running_event, mode=PUSH, b
         _logger.error("Exception happened in sending thread. Stopping buffer.", e)
 
 
-def start_server(channels, output_port, ring_buffer_length, use_analyzer=False):
-    _logger.info("Requesting stream with channels: %s", channels)
-
-    stream_address = dispatcher.request_stream(channels)
-
-    _logger.debug("Received stream address '%s'", stream_address)
+def start_server(stream_address, output_port, ring_buffer_length, use_analyzer=False):
+    _logger.info("Requesting stream from: %s", stream_address)
 
     message_buffer = deque(maxlen=ring_buffer_length)
 
@@ -108,7 +108,7 @@ def start_server(channels, output_port, ring_buffer_length, use_analyzer=False):
 def run():
     parser = argparse.ArgumentParser(description='bsread buffer')
 
-    parser.add_argument("-c", "--channels_file", help="JSON file with channels to buffer.")
+    parser.add_argument("stream", help="Stream source in format tcp://127.0.0.1:10000")
 
     parser.add_argument('-o', '--output_port', default=8082,
                         help="Port to bind the output stream to.")
@@ -126,13 +126,11 @@ def run():
     # Setup the logging level.
     logging.basicConfig(level=arguments.log_level, format='[%(levelname)s] %(message)s')
 
-    _logger.info("Loading channels list file '%s'.", arguments.channels_file)
+    _logger.info("Connecting to stream '%s'.", arguments.stream)
 
-    with open(arguments.channels_file) as input_file:
-        file_lines = input_file.readlines()
-        channels = [channel.strip() for channel in file_lines if not channel.strip().startswith("#") and channel.strip()]
-
-    start_server(channels=channels, output_port=arguments.output_port, ring_buffer_length=arguments.buffer_length,
+    start_server(stream_address=arguments.stream,
+                 output_port=arguments.output_port,
+                 ring_buffer_length=arguments.buffer_length,
                  use_analyzer=arguments.analyzer)
 
 
