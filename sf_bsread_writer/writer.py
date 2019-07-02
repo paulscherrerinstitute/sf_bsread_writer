@@ -125,8 +125,16 @@ class BsreadWriterManager(object):
 
                 writer.write_message(message)
 
-        _logger.info("Writing completed. Pulse_id range from %s to %s written to file.",
-                     start_pulse_id, self.stop_pulse_id)
+        if self.start_pulse_id is not None:
+            _logger.info("Writing completed. Pulse_id range from %s to %s written to file.",
+                         self.start_pulse_id, self.stop_pulse_id)
+
+        elif self.start_timestamp is not None:
+            _logger.info("Writing completed. Timestamp range from %s to %s written to file.",
+                         self.start_timestamp, self.stop_timestamp)
+
+        else:
+            _logger.warning("This should not be possible, but the file is probably still written fine.")
 
         os._exit(0)
 
