@@ -110,16 +110,16 @@ class BsreadH5Writer(object):
         _logger.info("Initializing format datasets.")
 
         self.h5_writer.file.create_dataset("/general/created",
-                                           data=numpy.string_(self.parameters["general/created"]))
+                                           data=numpy.string_(self.parameters.get("general/created", "not given")))
 
         self.h5_writer.file.create_dataset("/general/instrument",
-                                           data=numpy.string_(self.parameters["general/instrument"]))
+                                           data=numpy.string_(self.parameters.get("general/instrument", "not given")))
 
         self.h5_writer.file.create_dataset("/general/process",
-                                           data=numpy.string_(self.parameters["general/process"]))
+                                           data=numpy.string_(self.parameters.get("general/process", "not given")))
 
         self.h5_writer.file.create_dataset("/general/user",
-                                           data=numpy.string_(self.parameters["general/user"]))
+                                           data=numpy.string_(self.parameters.get("general/user", "not given")))
 
     def _get_channel_data_dataset_definition(self, channel_definition):
 
