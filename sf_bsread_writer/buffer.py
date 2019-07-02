@@ -4,15 +4,16 @@ from collections import deque
 from threading import Thread, Event
 from time import sleep, time
 
-from bsread import source
-from bsread.sender import sender, PUSH, SUB
+from bsread import source, PULL
+from bsread.sender import sender, PUSH
 
 from sf_bsread_writer.buffer_analyzer import analyze_message
 
 _logger = logging.getLogger(__name__)
 
 
-def buffer_bsread_messages(stream_address, message_buffer, running_event, use_analyzer=False, receive_timeout=1000, mode=SUB):
+def buffer_bsread_messages(stream_address, message_buffer, running_event, use_analyzer=False, receive_timeout=1000,
+                           mode=PULL):
 
     _logger.info("Input stream connecting to '%s'.", stream_address)
 

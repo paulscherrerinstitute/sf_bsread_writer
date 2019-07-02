@@ -8,7 +8,7 @@ import os
 
 import h5py
 import requests
-from bsread import dispatcher, PUB
+from bsread import PUSH
 from bsread.sender import sender
 
 from sf_bsread_writer import writer, buffer
@@ -59,7 +59,7 @@ class TestBsreadWriter(unittest.TestCase):
 
     def test_buffer_writer_integration(self):
 
-        with sender(port=self.buffer_stream_port, queue_size=100, mode=PUB) as source_stream:
+        with sender(port=self.buffer_stream_port, queue_size=100, mode=PUSH) as source_stream:
 
             self.buffer_process.start()
             sleep(0.5)
