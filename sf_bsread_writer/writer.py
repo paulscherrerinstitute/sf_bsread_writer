@@ -64,7 +64,7 @@ class BsreadWriterManager(object):
     def _stop_writing(self, writer):
         writer.prune_and_close(self.stop_pulse_id)
 
-        _logger.info("Stopping bsread writer at pulse_id: %d" % self.stop_pulse_id)
+        _logger.info("Stopping bsread writer at pulse_id: %s" % self.stop_pulse_id)
         self._running_event.clear()
 
     def write_stream(self, start_pulse_id, start_timestamp):
@@ -125,7 +125,7 @@ class BsreadWriterManager(object):
 
                 writer.write_message(message)
 
-        _logger.info("Writing completed. Pulse_id range from %d to %d written to file.",
+        _logger.info("Writing completed. Pulse_id range from %s to %s written to file.",
                      start_pulse_id, self.stop_pulse_id)
 
         os._exit(0)
@@ -165,7 +165,7 @@ class BsreadWriterManager(object):
 
     def start_writer(self, pulse_id):
 
-        _logger.info("Starting to write with pulse_id %d." % pulse_id)
+        _logger.info("Starting to write with pulse_id %s." % pulse_id)
 
         if pulse_id is None:
             current_timestamp = time()
@@ -188,7 +188,7 @@ class BsreadWriterManager(object):
             os._exit(-1)
 
     def stop_writer(self, pulse_id):
-        _logger.info("Set stop_pulse_id=%d", pulse_id)
+        _logger.info("Set stop_pulse_id=%s", pulse_id)
 
         if pulse_id is None:
             current_timestamp = time()
