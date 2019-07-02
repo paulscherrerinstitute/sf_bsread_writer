@@ -113,7 +113,7 @@ def run():
 
     parser.add_argument('-o', '--output_port', default=8082,
                         help="Port to bind the output stream to.")
-    parser.add_argument("-b", "--buffer_length", default=100,
+    parser.add_argument("-b", "--buffer_length", type=int, default=100,
                         help="Length of the ring buffer.")
 
     parser.add_argument("--log_level", default="INFO",
