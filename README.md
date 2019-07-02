@@ -20,7 +20,7 @@ The project is made up of 2 parts:
 - Buffer service (buffer the incoming messages)
 - Writer process (write the desired messages from the buffer)
 
-Due to a relatively high start lag in getting bsread data, connecting to the sources when the DAQ system is triggered 
+Due to a relatively high start lag in getting bsread data, connecting to the source when the DAQ system is triggered 
 does not work (you miss the first few messages). If, for example, the detector starts getting images with pulse_id 100,
 bsread would start getting messages with pulse_id 120 (the actual gap varies based on the repetition rate). 
 We need bsread messages from pulse_id 100 on to be stored together with the detector images, 
@@ -29,18 +29,20 @@ this is why we buffer all the messages all the time.
 For info on how to run the buffer and writer, please see [Running the servers](#running_the_servers).
 
 ### Buffer service
-The buffer service is running in the background. It accepts a list of channels to buffer - if you want to change the 
-list of channels, you have to modify the config file, and restart the buffer. Using **systemd** for running the 
-service is recommended.
+The buffer service is running in the background. It accepts a tcp stream address - if you want to buffer a different stream,
+you have to re-start the buffer. Using **systemd** for running the service is recommended.
 
 The buffer sends out buffered messages to whoever it connects to its output port.
 
 ### Writer process
 The writer process is lunched and stopped once per DAQ acquisition. It connects to the buffer service and starts 
-writing messages to disk from the specified start_pulse_id until the specified stop_pulse_id.
-You specify this 2 parameters by calling its REST Api (see [REST API](#rest_api)).
+writing messages to disk from the specified start_pulse_id until the specified stop_pulse_id. Alternativelly, you can 
+tell the writer to write the messages without knowing the pulse_id - write from the moment you call start_now until 
+the moment you call stop_now. Please note that this mode is not synchronized with any detector.
 
-The writer uses the SwissFEL specific file format.
+You specify the start and stop pulse_id by calling its REST Api (see [REST API](#rest_api)).
+
+The writer uses the SwissFEL specific file format (the same as sf_databuffer_writer).
 
 <a id="build"></a>
 ## Build
@@ -102,16 +104,17 @@ error it cannot recover from - it is best to have it on auto restart.
 ```bash
 sf_bsread_buffer -h
 
-usage: sf_bsread_buffer [-h] [-c CHANNELS_FILE] [-o OUTPUT_PORT] [-b BUFFER_LENGTH]
+usage: sf_bsread_buffer [-h] [-o OUTPUT_PORT] [-b BUFFER_LENGTH]
                         [--log_level {CRITICAL,ERROR,WARNING,INFO,DEBUG}]
                         [--analyzer]
 
 bsread buffer
 
+positional arguments:
+  stream        Stream source in format tcp://127.0.0.1:10000
+
 optional arguments:
   -h, --help            show this help message and exit
-  -c CHANNELS_FILE, --channels_file CHANNELS_FILE
-                        JSON file with channels to buffer.
   -o OUTPUT_PORT, --output_port OUTPUT_PORT
                         Port to bind the output stream to.
   -b BUFFER_LENGTH, --buffer_length BUFFER_LENGTH
@@ -155,8 +158,8 @@ optional arguments:
 **WARNING**: Only the writer has a web interface - the buffer is just a service 
 running in the background with no interaction.
 
-All request (with the exception of **start\_pulse\_id**, **stop\_pulse\_id**, and **kill**) return a JSON 
-with the following fields:
+All request (with the exception of **start\_pulse\_id**, **stop\_pulse\_id**, **start\_now**, **stop\_now** 
+and **kill**) return a JSON with the following fields:
 - **state** - \["ok", "error"\]
 - **status** - What happened on the server or error message, depending on the state.
 - Optional request specific field - \["statistics", "parameters"]
@@ -182,4 +185,10 @@ In the API description, localhost and port 8888 are assumed. Please change this 
     - Empty response.
 
 * `PUT localhost:8888/stop_pulse_id/<pulse_id>` - set last pulse_id to write to the output file.
+    - Empty response.
+    
+* `PUT localhost:8888/start_now` - start the acquisition and discard messages before the current timestamp.
+    - Empty response.
+
+* `PUT localhost:8888/stop_now` - stop the acquisition and discard messages after the current timestamp.
     - Empty response.
