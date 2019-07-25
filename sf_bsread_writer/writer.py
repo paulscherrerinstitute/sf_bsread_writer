@@ -62,7 +62,8 @@ class BsreadWriterManager(object):
         return False
 
     def _stop_writing(self, writer):
-        writer.prune_and_close(self.stop_pulse_id)
+        if writer:
+            writer.prune_and_close(self.stop_pulse_id)
 
         _logger.info("Stopping bsread writer at pulse_id: %s" % self.stop_pulse_id)
         self._running_event.clear()
@@ -82,7 +83,11 @@ class BsreadWriterManager(object):
         if start_timestamp is not None:
             _logger.info("First message to write after timestamp %s.", start_timestamp)
 
-        writer = BsreadH5Writer(self.output_file, self.parameters)
+        if self.output_file != "/dev/null":
+            writer = BsreadH5Writer(self.output_file, self.parameters)
+        else:
+            writer = None
+
         handler = extended.Handler()
 
         with source(host=source_host, port=source_port,
@@ -122,8 +127,9 @@ class BsreadWriterManager(object):
                 if self._is_last_message_too_late():
                     self._stop_writing(writer)
                     continue
-
-                writer.write_message(message)
+             
+                if writer:
+                    writer.write_message(message)
 
         if self.start_pulse_id is not None:
             _logger.info("Writing completed. Pulse_id range from %s to %s written to file.",
