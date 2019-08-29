@@ -10,6 +10,18 @@ _logger = logging.getLogger(__name__)
 
 
 DATA_DATASET_NAME = "data"
+CHUNK_SIZE = 1000
+
+
+def get_chunk_size(dataset_size=None):
+
+    chunking_size = [CHUNK_SIZE]
+
+    if dataset_size is not None:
+        chunking_size = dataset_size
+        chunking_size[0] = CHUNK_SIZE
+
+    return tuple(chunking_size)
 
 
 class BsreadH5Writer(object):
@@ -75,9 +87,10 @@ class BsreadH5Writer(object):
 
                 _logger.debug("Creating datasets for channel_name '%s' at index %d.", channel_name, channel_index)
 
-                self.h5_writer.add_dataset(channel_group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8')
+                self.h5_writer.add_dataset(channel_group_name + 'pulse_id', dataset_group_name='pulse_id', dtype='i8',
+                                           chunks=get_chunk_size())
                 self.h5_writer.add_dataset(channel_group_name + 'is_data_present', dataset_group_name='is_data_present',
-                                           dtype='u1')
+                                           dtype='u1', chunks=get_chunk_size())
 
                 self._setup_channel_data_dataset(channel_group_name, channel_index, channel_definition, channel_value)
 
@@ -153,7 +166,7 @@ class BsreadH5Writer(object):
             dtype, dataset_shape, dataset_max_shape = self._get_channel_data_dataset_definition(channel_definition)
 
             self.h5_writer.add_dataset(channel_group_name + 'data', dataset_group_name='data', shape=dataset_shape,
-                                       maxshape=dataset_max_shape, dtype=dtype)
+                                       maxshape=dataset_max_shape, dtype=dtype, chunks=get_chunk_size(dataset_shape))
 
             self.cached_channel_definitions[channel_index] = channel_definition
 
@@ -165,7 +178,8 @@ class BsreadH5Writer(object):
                                        dataset_name=channel_group_name + DATA_DATASET_NAME,
                                        dtype=dtype,
                                        shape=dataset_shape,
-                                       maxshape=dataset_max_shape)
+                                       maxshape=dataset_max_shape,
+                                       chunks=get_chunk_size(dataset_shape))
 
         self.cached_channel_definitions[channel_index] = channel_definition
 
