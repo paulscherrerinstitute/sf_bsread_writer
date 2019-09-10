@@ -10,7 +10,7 @@ _logger = logging.getLogger(__name__)
 
 
 DATA_DATASET_NAME = "data"
-CHUNK_SIZE = 1000
+CHUNK_SIZE = 100
 
 
 def get_chunk_size(dataset_size=None):
