@@ -185,6 +185,10 @@ class BsreadWriterManager(object):
         if output_file is not None:
             self.output_file = output_file
             persistant_writer = True
+
+            self.stop_pulse_id = None
+            self.stop_timestamp = None
+
             _logger.info("Output file changed to %s.", output_file)
 
         _logger.info("Starting to write with pulse_id %s." % pulse_id)
