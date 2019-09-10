@@ -68,7 +68,7 @@ class BsreadWriterManager(object):
         _logger.info("Stopping bsread writer at pulse_id: %s" % self.stop_pulse_id)
         self._running_event.clear()
 
-    def write_stream(self, start_pulse_id, start_timestamp, output_file):
+    def write_stream(self, start_pulse_id, start_timestamp, output_file, persistant_writer=False):
 
         source_host, source_port = self.stream_address.rsplit(":", maxsplit=1)
 
@@ -142,7 +142,8 @@ class BsreadWriterManager(object):
         else:
             _logger.warning("This should not be possible, but the file is probably still written fine.")
 
-        os._exit(0)
+        if not persistant_writer:
+            os._exit(0)
 
     def set_parameters(self, parameters):
 
@@ -179,8 +180,11 @@ class BsreadWriterManager(object):
 
     def start_writer(self, pulse_id, output_file=None):
 
+        persistant_writer = False
+
         if output_file is not None:
             self.output_file = output_file
+            persistant_writer = True
             _logger.info("Output file changed to %s.", output_file)
 
         _logger.info("Starting to write with pulse_id %s." % pulse_id)
@@ -196,7 +200,7 @@ class BsreadWriterManager(object):
             self.start_timestamp = None
 
         self._writing_thread = Thread(target=self.write_stream, args=(self.start_pulse_id, self.start_timestamp,
-                                                                      self.output_file))
+                                                                      self.output_file, persistant_writer))
 
         self._running_event.clear()
 
