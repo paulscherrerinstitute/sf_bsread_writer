@@ -42,7 +42,7 @@ def register_rest_interface(app, manager):
     def start_now():
         _logger.info("Starting writer without pulse_id.")
 
-        data = bottle.request.json()
+        data = bottle.request.json
         output_file = data.get("output_file")
 
         manager.start_writer(None, output_file)
