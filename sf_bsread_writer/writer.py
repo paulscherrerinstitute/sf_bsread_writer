@@ -68,7 +68,7 @@ class BsreadWriterManager(object):
         _logger.info("Stopping bsread writer at pulse_id: %s" % self.stop_pulse_id)
         self._running_event.clear()
 
-    def write_stream(self, start_pulse_id, start_timestamp):
+    def write_stream(self, start_pulse_id, start_timestamp, output_file):
 
         source_host, source_port = self.stream_address.rsplit(":", maxsplit=1)
 
@@ -83,8 +83,8 @@ class BsreadWriterManager(object):
         if start_timestamp is not None:
             _logger.info("First message to write after timestamp %s.", start_timestamp)
 
-        if self.output_file != "/dev/null":
-            writer = BsreadH5Writer(self.output_file, self.parameters)
+        if output_file != "/dev/null":
+            writer = BsreadH5Writer(output_file, self.parameters)
         else:
             writer = None
 
@@ -177,7 +177,11 @@ class BsreadWriterManager(object):
 
         os._exit(0)
 
-    def start_writer(self, pulse_id):
+    def start_writer(self, pulse_id, output_file=None):
+
+        if output_file is not None:
+            self.output_file = output_file
+            _logger.info("Output file changed to %s.", output_file)
 
         _logger.info("Starting to write with pulse_id %s." % pulse_id)
 
@@ -191,7 +195,8 @@ class BsreadWriterManager(object):
             self.start_pulse_id = pulse_id
             self.start_timestamp = None
 
-        self._writing_thread = Thread(target=self.write_stream, args=(self.start_pulse_id, self.start_timestamp))
+        self._writing_thread = Thread(target=self.write_stream, args=(self.start_pulse_id, self.start_timestamp,
+                                                                      self.output_file))
 
         self._running_event.clear()
 
